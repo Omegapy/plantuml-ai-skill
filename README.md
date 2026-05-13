@@ -61,6 +61,25 @@ plantuml-skill report --manifest data/manifests/verified.jsonl
 
 External corpus acquisition is deliberately conservative. Git sources can be cloned from `config/sources.yml`; dataset sources that retain mixed original licenses must be manually staged after license review.
 
+For a real permissive Git-source smoke run:
+
+```bash
+plantuml-skill acquire --source plantuml-examples-mattjhayes --output data/manifests/plantuml-examples.jsonl
+plantuml-skill render --manifest data/manifests/plantuml-examples.jsonl --output data/manifests/plantuml-examples-rendered.jsonl --render-dir data/rendered/plantuml-examples
+plantuml-skill verify --manifest data/manifests/plantuml-examples-rendered.jsonl --output data/manifests/plantuml-examples-verified.jsonl
+plantuml-skill report --manifest data/manifests/plantuml-examples-rendered.jsonl --output data/reports/plantuml-examples-report.md
+```
+
+The real-source verifier may report renderer failures, remote include skips, or PNG mismatches. Those are useful corpus diagnostics rather than repository test failures.
+
+For Python-source-conditioned examples:
+
+```bash
+plantuml-skill acquire --source py2puml --output data/manifests/py2puml.jsonl
+plantuml-skill render --manifest data/manifests/py2puml.jsonl --output data/manifests/py2puml-rendered.jsonl --render-dir data/rendered/py2puml
+plantuml-skill verify --manifest data/manifests/py2puml-rendered.jsonl --output data/manifests/py2puml-verified.jsonl
+```
+
 ## Data Policy
 
 Tracked files include code, schemas, configuration, documentation, and small fixtures. Generated or downloaded artifacts are ignored:
@@ -69,6 +88,7 @@ Tracked files include code, schemas, configuration, documentation, and small fix
 - `data/rendered/`
 - `data/manifests/`
 - `data/reports/`
+- `data/vendor/`
 - `tools/plantuml/`
 - `.cache/`
 

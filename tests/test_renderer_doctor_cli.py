@@ -44,6 +44,15 @@ class RendererDoctorCliTests(unittest.TestCase):
             self.assertIn("-DPLANTUML_SECURITY_PROFILE=SANDBOX", result.command)
             self.assertTrue(renderer.testdot().ok)
 
+    def test_renderer_includes_vendored_include_path_property(self) -> None:
+        renderer = PlantUMLRenderer(
+            jar_path=Path("plantuml.jar"),
+            java_bin="/tmp/java",
+            include_roots=[Path("/tmp/vendor/c4"), Path("/tmp/vendor/stdlib")],
+        )
+        command = renderer.command_for("-tsvg")
+        self.assertIn("-Dplantuml.include.path=/tmp/vendor/c4:/tmp/vendor/stdlib", command)
+
     def test_cli_coverage_and_fixture_acquire(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "fixtures.jsonl"

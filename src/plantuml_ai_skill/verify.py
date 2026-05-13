@@ -85,6 +85,7 @@ def _decode_png_grayscale(png_bytes: bytes) -> tuple[int, int, list[int]]:
     width = height = 0
     color_type = -1
     bit_depth = -1
+    palette: list[tuple[int, int, int]] = []
     idat = bytearray()
     while offset < len(png_bytes):
         length = struct.unpack(">I", png_bytes[offset : offset + 4])[0]
@@ -95,11 +96,18 @@ def _decode_png_grayscale(png_bytes: bytes) -> tuple[int, int, list[int]]:
             width, height, bit_depth, color_type = struct.unpack(">IIBB", chunk_data[:10])
         elif chunk_type == b"IDAT":
             idat.extend(chunk_data)
+        elif chunk_type == b"PLTE":
+            palette = [
+                (chunk_data[index], chunk_data[index + 1], chunk_data[index + 2])
+                for index in range(0, len(chunk_data), 3)
+            ]
         elif chunk_type == b"IEND":
             break
-    if bit_depth != 8 or color_type not in {0, 2, 6}:
+    if bit_depth != 8 or color_type not in {0, 2, 3, 6}:
         raise ValueError(f"unsupported PNG bit depth/color type: {bit_depth}/{color_type}")
-    bytes_per_pixel = {0: 1, 2: 3, 6: 4}[color_type]
+    if color_type == 3 and not palette:
+        raise ValueError("indexed PNG is missing PLTE palette")
+    bytes_per_pixel = {0: 1, 2: 3, 3: 1, 6: 4}[color_type]
     raw = zlib.decompress(bytes(idat))
     row_size = width * bytes_per_pixel
     rows: list[bytes] = []
@@ -119,6 +127,12 @@ def _decode_png_grayscale(png_bytes: bytes) -> tuple[int, int, list[int]]:
             base = x * bytes_per_pixel
             if color_type == 0:
                 grayscale.append(row[base])
+            elif color_type == 3:
+                index = row[base]
+                if index >= len(palette):
+                    raise ValueError(f"indexed PNG palette index out of range: {index}")
+                r, g, b = palette[index]
+                grayscale.append(int(0.299 * r + 0.587 * g + 0.114 * b))
             else:
                 r, g, b = row[base], row[base + 1], row[base + 2]
                 grayscale.append(int(0.299 * r + 0.587 * g + 0.114 * b))

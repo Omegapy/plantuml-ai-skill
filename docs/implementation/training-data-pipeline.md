@@ -75,3 +75,25 @@ Required metadata includes:
 - gold evaluation is separate from bulk training;
 - source-conditioned Python cases get their own split;
 - synthetic records are capped before entering augmentation.
+
+## Real-Source Smoke Coverage
+
+The first external smoke target is `plantuml-examples-mattjhayes`, pinned in `config/sources.yml` to a concrete commit. This source is small, permissively licensed, and varied enough to test Markdown extraction, published PNG references, renderer failures, and remote include blocking.
+
+Expected workflow:
+
+```bash
+plantuml-skill acquire --source plantuml-examples-mattjhayes --output data/manifests/plantuml-examples.jsonl
+plantuml-skill render --manifest data/manifests/plantuml-examples.jsonl --output data/manifests/plantuml-examples-rendered.jsonl --render-dir data/rendered/plantuml-examples
+plantuml-skill verify --manifest data/manifests/plantuml-examples-rendered.jsonl --output data/manifests/plantuml-examples-verified.jsonl
+```
+
+Non-green records are still valuable. They identify syntax incompatibilities, renderer drift, remote include dependencies, and PNG reference mismatches that should be curated before records are promoted into gold evaluation.
+
+`py2puml` is also pinned and smoke-tested as a source-conditioned corpus. Acquisition pairs expected `.puml` files with nearby Python files, then keeps those records in `source_conditioned_eval`:
+
+```bash
+plantuml-skill acquire --source py2puml --output data/manifests/py2puml.jsonl
+plantuml-skill render --manifest data/manifests/py2puml.jsonl --output data/manifests/py2puml-rendered.jsonl --render-dir data/rendered/py2puml
+plantuml-skill verify --manifest data/manifests/py2puml-rendered.jsonl --output data/manifests/py2puml-verified.jsonl
+```

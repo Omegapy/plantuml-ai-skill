@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
+from .schema import validate_against_schema
+
 
 REQUIRED_RECORD_FIELDS = [
     "id",
@@ -32,6 +34,10 @@ REQUIRED_RECORD_FIELDS = [
     "verification_status",
     "render_fail_reason",
     "purpose",
+    "attribution",
+    "license_path",
+    "source_commit",
+    "source_repo_url",
 ]
 
 
@@ -62,6 +68,10 @@ class CorpusRecord:
     verification_status: str
     render_fail_reason: str
     purpose: list[str]
+    attribution: str = ""
+    license_path: str = ""
+    source_commit: str = ""
+    source_repo_url: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -75,7 +85,8 @@ class CorpusRecord:
         payload["is_self_contained"] = bool(payload["is_self_contained"])
         payload["uses_include"] = bool(payload["uses_include"])
         payload["uses_icon_library"] = bool(payload["uses_icon_library"])
-        payload.setdefault("extra", {})
+        payload["extra"] = dict(payload.get("extra") or {})
+        payload["extra"].update({key: value for key, value in data.items() if key not in known})
         return cls(**payload)
 
     def to_mapping(self) -> dict[str, Any]:
@@ -85,6 +96,9 @@ class CorpusRecord:
 
 
 def validate_record_mapping(data: dict[str, Any]) -> None:
+    schema_errors = validate_against_schema(data)
+    if schema_errors:
+        raise ValueError("; ".join(schema_errors))
     missing = [field for field in REQUIRED_RECORD_FIELDS if field not in data]
     if missing:
         raise ValueError(f"manifest record is missing fields: {', '.join(missing)}")

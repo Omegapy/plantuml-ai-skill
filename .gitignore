@@ -32,6 +32,7 @@ Temporary Items
 /data/rendered/
 /data/manifests/
 /data/reports/
+/data/vendor/
 /tools/plantuml/
 /.cache/
 

@@ -1,0 +1,17 @@
+' Minimal test-only C4 shim used to verify vendored include resolution.
+' Real C4-PlantUML acquisition should vendor the upstream include files.
+!procedure Person($alias, $label)
+rectangle $label as $alias <<person>>
+!endprocedure
+
+!procedure Container($alias, $label, $technology="")
+rectangle "$label\n$technology" as $alias <<container>>
+!endprocedure
+
+!procedure System_Boundary($alias, $label)
+rectangle $label as $alias {
+!endprocedure
+
+!procedure Rel($from, $to, $label)
+$from --> $to : $label
+!endprocedure

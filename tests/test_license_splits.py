@@ -3,7 +3,7 @@ import tempfile
 import unittest
 
 from plantuml_ai_skill.acquisition import acquire_fixtures
-from plantuml_ai_skill.license_policy import license_family, may_enter_training_split
+from plantuml_ai_skill.license_policy import license_family, may_enter_training_split, training_block_reason
 from plantuml_ai_skill.splits import build_splits
 
 
@@ -22,6 +22,7 @@ class LicenseSplitTests(unittest.TestCase):
         self.assertTrue(may_enter_training_split("MIT", ["training"]))
         self.assertFalse(may_enter_training_split("GPL-3.0", ["training"]))
         self.assertFalse(may_enter_training_split("MIT", ["gold_eval"]))
+        self.assertEqual("blocked_copyleft_license", training_block_reason("GPL-3.0", ["training"]))
 
     def test_build_splits_outputs_expected_groups(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

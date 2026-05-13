@@ -30,7 +30,9 @@ On macOS, Homebrew installs OpenJDK as keg-only. The CLI automatically checks `/
 
 ## Include Handling
 
-The extractor records `!include` dependencies and marks diagrams as non-self-contained when includes are present. External rendering should use vendored include roots only. Remote includes are treated as blocked during batch verification.
+The extractor records `!include` dependencies and marks diagrams as non-self-contained when includes are present. External rendering uses local vendored include roots only. Remote includes are treated as blocked during batch verification.
+
+Resolved local includes are inlined before the diagram is piped to PlantUML. This keeps rendering compatible with the conservative sandbox profile without letting the renderer read arbitrary files at runtime.
 
 ## SVG Comparison
 
@@ -40,7 +42,7 @@ This avoids false mismatches from volatile SVG identifiers without pretending th
 
 ## PNG Fallback
 
-PNG comparison is a fallback for sources that publish only raster references. The stdlib implementation decodes simple 8-bit PNGs, computes an average hash, and compares Hamming distance. It is intentionally secondary to SVG comparison.
+PNG comparison is a fallback for sources that publish only raster references. The stdlib implementation decodes 8-bit grayscale, RGB, RGBA, and indexed-color PNGs, computes an average hash, and compares Hamming distance. It is intentionally secondary to SVG comparison.
 
 ## Source-Conditioned Evaluation
 

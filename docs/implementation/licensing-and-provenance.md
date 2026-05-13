@@ -15,8 +15,14 @@ Every manifest record stores:
 - `puml_path`
 - `published_render_path`
 - `include_deps`
+- `attribution`
+- `license_path`
+- `source_commit`
+- `source_repo_url`
 
 This keeps mixed sources such as Repo-PlantUML-Dataset auditable after extraction, rendering, and split construction.
+
+For Git sources, acquisition records the checked-out commit and the first detected root license/notice file. Mixed-license datasets still require row-level license staging before any broad training use.
 
 ## License Families
 

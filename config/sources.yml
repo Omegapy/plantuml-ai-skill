@@ -6,7 +6,13 @@
     "jar_sha256": "53af6760d96bb2737e5e4386e832b46339fc29dec74f412d7c12db7c30db8ec4",
     "java_minimum_major": 11,
     "graphviz_required": true,
-    "native_binary_fallback": true
+    "native_binary_fallback": true,
+    "include_roots": [
+      "tests/fixtures/vendor/c4",
+      "data/vendor/c4-plantuml",
+      "data/vendor/plantuml-stdlib",
+      "data/vendor/aws-icons-for-plantuml"
+    ]
   },
   "recommendation_features": [
     "pinned_java_plantuml_renderer",
@@ -65,8 +71,8 @@
       "default_purpose": ["gold_eval", "architecture_specialization", "renderer_regression"],
       "license_policy": "permissive:MIT",
       "acquisition_mode": "git",
-      "pin_strategy": "tag",
-      "ref": "v2.12.0",
+      "pin_strategy": "commit",
+      "ref": "1edfb8a878baaa821e54cf423a070c792e8677c6",
       "expected_diagram_families": ["c4_context", "c4_container", "c4_component", "c4_dynamic", "c4_deployment", "sequence"],
       "allowed_split_targets": ["gold_eval", "renderer_regression", "training"],
       "notes": "Vendor C4 include files before rendering examples."
@@ -80,8 +86,8 @@
       "default_purpose": ["source_conditioned_eval", "gold_eval"],
       "license_policy": "permissive:MIT",
       "acquisition_mode": "git",
-      "pin_strategy": "commit_or_tag",
-      "ref": "",
+      "pin_strategy": "commit",
+      "ref": "1c7e73280d609bc2b17f2e522d15775f51396ac1",
       "expected_diagram_families": ["class"],
       "allowed_split_targets": ["source_conditioned_eval", "gold_eval"],
       "notes": "Use tests and expected outputs as Python source to PlantUML fixtures."
@@ -139,8 +145,8 @@
       "default_purpose": ["gold_eval", "smoke_tests"],
       "license_policy": "permissive:Apache-2.0",
       "acquisition_mode": "git",
-      "pin_strategy": "commit_or_tag",
-      "ref": "",
+      "pin_strategy": "commit",
+      "ref": "0b41e032cf1550135757753d0e889e83984a723c",
       "expected_diagram_families": ["mixed_plantuml"],
       "allowed_split_targets": ["gold_eval", "renderer_regression", "training"],
       "notes": "Small permissive smoke-test corpus."
@@ -154,8 +160,8 @@
       "default_purpose": ["frozen_eval", "gold_eval"],
       "license_policy": "permissive:MIT",
       "acquisition_mode": "git",
-      "pin_strategy": "commit_or_tag",
-      "ref": "",
+      "pin_strategy": "commit",
+      "ref": "fd586b9d8bcba42fa286e7e6d72dd95b775ebf47",
       "expected_diagram_families": ["mixed_plantuml"],
       "allowed_split_targets": ["gold_eval"],
       "notes": "Older frozen benchmark tied to historical PlantUML and Graphviz versions."

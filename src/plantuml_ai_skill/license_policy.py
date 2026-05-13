@@ -36,3 +36,12 @@ def may_enter_training_split(license_text: str, purpose: list[str]) -> bool:
     if "training" not in purpose:
         return False
     return license_family(license_text) == "permissive"
+
+
+def training_block_reason(license_text: str, purpose: list[str]) -> str:
+    if "training" not in purpose:
+        return "not_marked_for_training"
+    family = license_family(license_text)
+    if family == "permissive":
+        return ""
+    return f"blocked_{family}_license"

@@ -29,6 +29,7 @@ class ExtractedDiagram:
     include_deps: list[str]
     is_self_contained: bool
     uses_icon_library: bool
+    block_index: int = 0
 
 
 def stable_id(source_name: str, path: Path, text: str) -> str:
@@ -93,17 +94,21 @@ def extract_from_file(path: Path, source_name: str) -> list[ExtractedDiagram]:
     for index, block in enumerate(raw_blocks):
         include_deps = parse_include_deps(block)
         render_path = find_same_basename_render(path)
-        record_path = path if index == 0 else path.with_name(f"{path.stem}-{index + 1}{path.suffix}")
         diagrams.append(
             ExtractedDiagram(
-                id=stable_id(source_name, record_path, block),
-                path=record_path,
+                id=stable_id(
+                    source_name,
+                    path if index == 0 else path.with_name(f"{path.stem}-{index + 1}{path.suffix}"),
+                    block,
+                ),
+                path=path,
                 text=block,
                 diagram_type=classify_diagram_type(block),
                 published_render_path=render_path,
                 include_deps=include_deps,
                 is_self_contained=not include_deps,
                 uses_icon_library=uses_icon_library(include_deps, block),
+                block_index=index,
             )
         )
     return diagrams

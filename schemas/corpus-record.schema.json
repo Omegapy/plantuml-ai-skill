@@ -27,7 +27,11 @@
     "render_hash_png",
     "verification_status",
     "render_fail_reason",
-    "purpose"
+    "purpose",
+    "attribution",
+    "license_path",
+    "source_commit",
+    "source_repo_url"
   ],
   "properties": {
     "id": { "type": "string", "minLength": 1 },
@@ -66,6 +70,7 @@
       "type": "string",
       "enum": [
         "not_verified",
+        "render_failed",
         "render_skipped",
         "rendered_no_reference",
         "svg_match",
@@ -80,6 +85,10 @@
     "purpose": {
       "type": "array",
       "items": { "type": "string" }
-    }
+    },
+    "attribution": { "type": "string" },
+    "license_path": { "type": "string" },
+    "source_commit": { "type": "string" },
+    "source_repo_url": { "type": "string" }
   }
 }

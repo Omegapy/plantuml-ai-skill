@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import shutil
 import subprocess
 from typing import Iterable
@@ -15,6 +16,9 @@ from .license_policy import license_family
 from .manifest import CorpusRecord, write_jsonl
 
 
+COMMIT_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
+
+
 def records_from_diagrams(
     diagrams: Iterable[ExtractedDiagram],
     source_name: str,
@@ -24,6 +28,10 @@ def records_from_diagrams(
     license_text: str,
     purpose: list[str],
     root: Path,
+    attribution: str = "",
+    license_path: str = "",
+    source_commit: str = "",
+    source_repo_url: str = "",
 ) -> list[CorpusRecord]:
     family = license_family(license_text)
     records: list[CorpusRecord] = []
@@ -61,6 +69,11 @@ def records_from_diagrams(
                 verification_status="not_verified",
                 render_fail_reason="",
                 purpose=purpose,
+                attribution=attribution or source_name,
+                license_path=license_path,
+                source_commit=source_commit,
+                source_repo_url=source_repo_url or source_url,
+                extra={"block_index": diagram.block_index},
             )
         )
     return records
@@ -82,6 +95,10 @@ def acquire_fixtures(
         license_text="MIT",
         purpose=["training", "gold_eval", "renderer_regression"],
         root=root,
+        attribution="PlantUML AI Skill test fixtures",
+        license_path="",
+        source_commit="local",
+        source_repo_url=str(root),
     )
     records.extend(_python_source_records(root))
     write_jsonl(records, output_path)
@@ -121,6 +138,10 @@ def _python_source_records(root: Path) -> list[CorpusRecord]:
                 verification_status="not_verified",
                 render_fail_reason="",
                 purpose=["source_conditioned_eval", "gold_eval"],
+                attribution="PlantUML AI Skill test fixtures",
+                license_path="",
+                source_commit="local",
+                source_repo_url=str(root),
             )
         )
         _ = puml_text
@@ -151,6 +172,8 @@ def acquire_source(
         write_jsonl([], output_path)
         return []
     staged_root = _stage_source(source, Path(raw_dir))
+    source_commit = _git_commit(staged_root) if (staged_root / ".git").exists() else source.ref
+    license_path = _find_license_file(staged_root)
     diagrams = extract_from_tree(staged_root, source_name=source.id)
     records = records_from_diagrams(
         diagrams,
@@ -161,7 +184,13 @@ def acquire_source(
         license_text=_license_from_policy(source),
         purpose=source.default_purpose,
         root=staged_root,
+        attribution=source.name,
+        license_path=str(license_path.relative_to(staged_root)) if license_path else "",
+        source_commit=source_commit,
+        source_repo_url=source.url,
     )
+    if source.id == "py2puml":
+        _attach_py2puml_python_sources(records, staged_root)
     write_jsonl(records, output_path)
     return records
 
@@ -173,11 +202,15 @@ def _stage_source(source: SourceDefinition, raw_dir: Path) -> Path:
         if destination.exists():
             subprocess.run(["git", "-C", str(destination), "fetch", "--tags"], check=False)
         else:
-            command = ["git", "clone", "--depth", "1"]
-            if source.ref and source.pin_strategy in {"tag", "commit"}:
+            command = ["git", "clone"]
+            if not _looks_like_commit(source.ref):
+                command.extend(["--depth", "1"])
+            if source.ref and source.pin_strategy in {"tag", "branch"}:
                 command.extend(["--branch", source.ref])
             command.extend([source.url, str(destination)])
             subprocess.run(command, check=True)
+        if source.ref:
+            subprocess.run(["git", "-C", str(destination), "checkout", "--detach", source.ref], check=True)
         return destination
     if source.acquisition_mode == "docs_crawl":
         destination.mkdir(parents=True, exist_ok=True)
@@ -205,6 +238,66 @@ def _license_from_policy(source: SourceDefinition) -> str:
     if "mixed" in source.license_policy.lower():
         return "Original repo licenses retained"
     return "verify-on-clone"
+
+
+def _looks_like_commit(ref: str) -> bool:
+    return bool(ref and COMMIT_RE.match(ref))
+
+
+def _git_commit(root: Path) -> str:
+    proc = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "HEAD"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return ""
+    return proc.stdout.decode("utf-8", errors="replace").strip()
+
+
+def _find_license_file(root: Path) -> Path | None:
+    candidates = []
+    for pattern in ("LICENSE", "LICENSE.*", "COPYING", "COPYING.*", "NOTICE", "NOTICE.*"):
+        candidates.extend(root.glob(pattern))
+    return sorted((path for path in candidates if path.is_file()), key=lambda path: path.name.lower())[0] if candidates else None
+
+
+def _attach_py2puml_python_sources(records: list[CorpusRecord], staged_root: Path) -> None:
+    for record in records:
+        puml_path = staged_root / record.puml_path
+        python_sources = python_sources_for_expected_puml(puml_path, staged_root)
+        if python_sources:
+            record.python_source_paths = [str(path.relative_to(staged_root)) for path in python_sources]
+            if "source_conditioned_eval" not in record.purpose:
+                record.purpose.append("source_conditioned_eval")
+        elif "source_conditioned_eval" in record.purpose:
+            record.purpose = [purpose for purpose in record.purpose if purpose != "source_conditioned_eval"]
+
+
+def python_sources_for_expected_puml(puml_path: Path, staged_root: Path) -> list[Path]:
+    """Heuristically pair py2puml expected .puml files with Python sources."""
+
+    if not puml_path.exists() or puml_path.suffix.lower() not in {".puml", ".plantuml", ".iuml"}:
+        return []
+    same_stem = puml_path.with_suffix(".py")
+    if same_stem.exists():
+        return [same_stem]
+    parent = puml_path.parent
+    candidates = sorted(
+        path
+        for path in parent.rglob("*.py")
+        if path.name != "__init__.py" and ".git" not in path.parts
+    )
+    if candidates:
+        return candidates
+    init_file = parent / "__init__.py"
+    if init_file.exists():
+        return [init_file]
+    if puml_path.name == "py2puml.domain.puml":
+        domain_root = staged_root / "src" / "py2puml" / "domain"
+        return sorted(domain_root.glob("*.py")) if domain_root.exists() else []
+    return []
 
 
 def ensure_generated_dirs() -> None:

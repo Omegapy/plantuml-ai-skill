@@ -12,13 +12,15 @@ from .assets import init_assets
 from .config import load_sources_config
 from .constants import DEFAULT_JAR_PATH, PROJECT_ROOT
 from .doctor import run_doctor
-from .extraction import extract_from_tree
+from .extraction import extract_from_tree, extract_plantuml_blocks
+from .includes import inline_resolved_includes, resolve_include_deps, unresolved_include_reason
+from .license_policy import training_block_reason
 from .manifest import CorpusRecord, read_jsonl, write_jsonl
 from .recommendation_coverage import check_recommendation_coverage
 from .renderer import PlantUMLRenderer, render_version_label
 from .reporting import write_report
 from .splits import build_splits
-from .verify import png_perceptual_match, svg_hash, svg_matches
+from .verify import png_average_hash, png_perceptual_match, svg_hash, svg_matches
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -51,6 +53,12 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--render-dir", default=str(PROJECT_ROOT / "data" / "rendered"))
     render.add_argument("--jar", default=str(DEFAULT_JAR_PATH))
     render.add_argument("--java", default="")
+    render.add_argument(
+        "--include-root",
+        action="append",
+        default=[],
+        help="local vendored include root; may be passed multiple times",
+    )
 
     verify = sub.add_parser("verify", help="verify rendered SVG/PNG against published references")
     verify.add_argument("--manifest", required=True)
@@ -150,19 +158,26 @@ def _extract(args: argparse.Namespace) -> int:
 
 def _render(args: argparse.Namespace) -> int:
     records = read_jsonl(args.manifest)
-    renderer = PlantUMLRenderer(jar_path=args.jar, java_bin=args.java or None)
+    include_roots = _include_roots(args.include_root)
+    renderer = PlantUMLRenderer(jar_path=args.jar, java_bin=args.java or None, include_roots=include_roots)
     render_dir = Path(args.render_dir)
     render_dir.mkdir(parents=True, exist_ok=True)
     updated: list[CorpusRecord] = []
     for record in records:
         try:
-            if record.include_deps:
+            puml_path = _resolve_record_path(record, args.source_root)
+            include_reason = unresolved_include_reason(record.include_deps, include_roots, puml_path.parent)
+            if include_reason:
                 record.render_status = "skipped"
-                record.render_fail_reason = "include_resolution_required"
+                record.render_fail_reason = include_reason
                 updated.append(record)
                 continue
-            puml_path = _resolve_record_path(record, args.source_root)
-            puml_text = puml_path.read_text(encoding="utf-8")
+            puml_text = _puml_text_for_record(record, puml_path)
+            if record.include_deps:
+                puml_text = inline_resolved_includes(
+                    puml_text,
+                    resolve_include_deps(record.include_deps, include_roots, puml_path.parent),
+                )
             result = renderer.render_svg(puml_text)
             if result.ok:
                 svg_path = render_dir / f"{record.id}.svg"
@@ -171,6 +186,17 @@ def _render(args: argparse.Namespace) -> int:
                 record.render_hash_svg = svg_hash(result.output)
                 record.plantuml_version = render_version_label()
                 record.render_fail_reason = ""
+                record.extra["rendered_svg_path"] = str(svg_path)
+                if record.published_render_path.lower().endswith(".png"):
+                    png_result = renderer.render_png(puml_text)
+                    if png_result.ok:
+                        png_path = render_dir / f"{record.id}.png"
+                        png_path.write_bytes(png_result.output)
+                        record.render_hash_png = str(png_average_hash(png_result.output))
+                        record.extra["rendered_png_path"] = str(png_path)
+                    else:
+                        record.render_status = "failed"
+                        record.render_fail_reason = png_result.stderr or f"png_returncode_{png_result.returncode}"
             else:
                 record.render_status = "failed"
                 record.render_fail_reason = result.stderr or f"returncode_{result.returncode}"
@@ -191,20 +217,23 @@ def _verify(args: argparse.Namespace) -> int:
     updated: list[CorpusRecord] = []
     for record in records:
         try:
-            if record.render_status == "skipped":
+            if record.render_status == "failed":
+                record.verification_status = "render_failed"
+            elif record.render_status == "skipped":
                 record.verification_status = "render_skipped"
             elif not record.published_render_path:
                 record.verification_status = "rendered_no_reference" if record.render_hash_svg else "not_verified"
             else:
                 reference_path = _resolve_reference_path(record, args.source_root)
-                rendered_path = PROJECT_ROOT / "data" / "rendered" / f"{record.id}{reference_path.suffix}"
                 if reference_path.suffix.lower() == ".svg":
+                    rendered_path = _rendered_output_path(record, "svg")
                     record.verification_status = (
                         "svg_match"
                         if svg_matches(rendered_path.read_bytes(), reference_path.read_bytes())
                         else "svg_mismatch"
                     )
                 elif reference_path.suffix.lower() == ".png":
+                    rendered_path = _rendered_output_path(record, "png")
                     record.verification_status = (
                         "png_match"
                         if png_perceptual_match(rendered_path.read_bytes(), reference_path.read_bytes())
@@ -221,7 +250,7 @@ def _verify(args: argparse.Namespace) -> int:
         record.verification_status.endswith("mismatch") or record.verification_status == "verify_error"
         for record in updated
     )
-    skipped = sum(record.verification_status == "render_skipped" for record in updated)
+    skipped = sum(record.verification_status in {"render_skipped", "render_failed"} for record in updated)
     checked = len(updated) - skipped
     print(f"Verified {checked - failures}/{checked} rendered records; skipped {skipped}; wrote {args.output}")
     return 0 if failures == 0 else 1
@@ -230,10 +259,18 @@ def _verify(args: argparse.Namespace) -> int:
 def _audit_licenses(args: argparse.Namespace) -> int:
     records = read_jsonl(args.manifest)
     counts: dict[str, int] = {}
+    blocked_training = 0
+    missing_attribution = 0
     for record in records:
         counts[record.license_family] = counts.get(record.license_family, 0) + 1
+        if "training" in record.purpose and training_block_reason(record.license, record.purpose):
+            blocked_training += 1
+        if not record.attribution:
+            missing_attribution += 1
     for family, count in sorted(counts.items()):
         print(f"{family}: {count}")
+    print(f"blocked_training_records: {blocked_training}")
+    print(f"missing_attribution: {missing_attribution}")
     return 0
 
 
@@ -282,6 +319,36 @@ def _resolve_reference_path(record: CorpusRecord, source_root: str) -> Path:
     if record.source_name == "fixtures":
         return PROJECT_ROOT / "tests" / "fixtures" / record.published_render_path
     return PROJECT_ROOT / "data" / "raw" / record.source_name / record.published_render_path
+
+
+def _rendered_output_path(record: CorpusRecord, suffix: str) -> Path:
+    key = f"rendered_{suffix}_path"
+    if key in record.extra:
+        return Path(str(record.extra[key]))
+    return PROJECT_ROOT / "data" / "rendered" / f"{record.id}.{suffix}"
+
+
+def _puml_text_for_record(record: CorpusRecord, puml_path: Path) -> str:
+    raw_text = puml_path.read_text(encoding="utf-8", errors="replace")
+    blocks = extract_plantuml_blocks(raw_text)
+    if not blocks:
+        return raw_text
+    block_index = int(record.extra.get("block_index", 0))
+    if block_index >= len(blocks):
+        raise IndexError(f"block_index {block_index} out of range for {puml_path}")
+    return blocks[block_index]
+
+
+def _include_roots(extra_roots: list[str]) -> list[Path]:
+    config = load_sources_config()
+    configured = config.renderer.get("include_roots", [])
+    roots: list[Path] = []
+    for value in list(configured) + list(extra_roots):
+        path = Path(value)
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+        roots.append(path)
+    return roots
 
 
 if __name__ == "__main__":  # pragma: no cover

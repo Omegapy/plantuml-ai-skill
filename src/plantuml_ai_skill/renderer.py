@@ -44,11 +44,13 @@ class PlantUMLRenderer:
         jar_path: Path | str = DEFAULT_JAR_PATH,
         java_bin: str | None = None,
         graphviz_dot: str | None = None,
+        include_roots: list[Path | str] | None = None,
         timeout: int = 30,
     ) -> None:
         self.jar_path = Path(jar_path)
         self.java_bin = java_bin or default_java_bin()
         self.graphviz_dot = graphviz_dot or shutil.which("dot") or "dot"
+        self.include_roots = [Path(root) for root in include_roots or []]
         self.timeout = timeout
 
     def render_svg(self, puml_text: str) -> RenderResult:
@@ -62,17 +64,25 @@ class PlantUMLRenderer:
         return self._run(command, input_text="")
 
     def command_for(self, output_format: str) -> list[str]:
-        return [
+        command = [
             self.java_bin,
             "-Djava.awt.headless=true",
             "-DPLANTUML_SECURITY_PROFILE=SANDBOX",
-            "-jar",
-            str(self.jar_path),
-            output_format,
-            "-pipe",
-            "-charset",
-            "UTF-8",
         ]
+        if self.include_roots:
+            include_path = os.pathsep.join(str(root) for root in self.include_roots)
+            command.append(f"-Dplantuml.include.path={include_path}")
+        command.extend(
+            [
+                "-jar",
+                str(self.jar_path),
+                output_format,
+                "-pipe",
+                "-charset",
+                "UTF-8",
+            ]
+        )
+        return command
 
     def _render(self, puml_text: str, output_format: str) -> RenderResult:
         command = self.command_for(output_format)

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install renderer dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz openjdk-17-jre-headless
+
+      - name: Install package
+        run: python -m pip install -e .
+
+      - name: Download pinned PlantUML jar
+        run: plantuml-skill init-assets
+
+      - name: Check renderer stack
+        run: plantuml-skill doctor
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Run fixture corpus smoke workflow
+        run: |
+          plantuml-skill coverage --json
+          plantuml-skill acquire --source fixtures --output data/manifests/fixtures.jsonl
+          plantuml-skill render --manifest data/manifests/fixtures.jsonl --output data/manifests/rendered.jsonl
+          plantuml-skill verify --manifest data/manifests/rendered.jsonl --output data/manifests/verified.jsonl
+          plantuml-skill audit-licenses --manifest data/manifests/verified.jsonl
+          plantuml-skill build-splits --manifest data/manifests/verified.jsonl
+          plantuml-skill report --manifest data/manifests/verified.jsonl

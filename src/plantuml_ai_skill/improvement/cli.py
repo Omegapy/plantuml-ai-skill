@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import shutil
 
+from plantuml_ai_skill.config import load_sources_config
 from plantuml_ai_skill.constants import DEFAULT_JAR_PATH, PROJECT_ROOT
 from plantuml_ai_skill.renderer import PlantUMLRenderer
 
@@ -296,13 +297,18 @@ def _evaluate(args: argparse.Namespace) -> int:
     cases = load_eval_cases(_project_path(run.suite_path))
     attempts = load_attempts(_project_path(run.attempts_path))
     render_dir = Path(args.render_dir) if args.render_dir else _project_path(run.results_path).parent / "rendered"
-    renderer = None if args.no_render else PlantUMLRenderer(jar_path=args.jar, java_bin=args.java or None)
+    include_roots = _include_roots(args.include_root)
+    renderer = (
+        None
+        if args.no_render
+        else PlantUMLRenderer(jar_path=args.jar, java_bin=args.java or None, include_roots=include_roots)
+    )
     results = evaluate_attempts(
         cases,
         attempts,
         renderer,
         render_dir=render_dir,
-        include_roots=[_project_path(path) for path in args.include_root],
+        include_roots=include_roots,
         allow_missing_attempts=args.allow_missing_attempts,
     )
     write_jsonl(results, _project_path(run.results_path))
@@ -389,6 +395,12 @@ def _project_path(value: str | Path) -> Path:
     if path.is_absolute():
         return path
     return STATE_PROJECT_ROOT / path
+
+
+def _include_roots(extra_roots: list[str]) -> list[Path]:
+    config = load_sources_config()
+    configured = config.renderer.get("include_roots", [])
+    return [_project_path(path) for path in [*configured, *extra_roots]]
 
 
 def _ensure_improver_skill_files(no_overwrite: bool) -> list[Path]:

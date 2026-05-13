@@ -68,3 +68,16 @@ Web --> API : HTTPS
 API --> DB : SQL
 @enduml
 ```
+
+## C4 Container
+
+```plantuml
+@startuml
+!include C4_Container.puml
+Person(user, "User")
+System_Boundary(system, "Diagram Service") {
+  Container(api, "API", "Python/FastAPI")
+}
+Rel(user, api, "Uses")
+@enduml
+```

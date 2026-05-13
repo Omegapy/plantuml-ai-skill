@@ -25,8 +25,9 @@ Read `references/output-contract.md` when the user needs a strict machine-readab
 2. Draft self-contained PlantUML first.
 3. Add every required participant/entity before drawing relationships.
 4. Use clear labels on important edges, especially outcomes, errors, retries, ownership, and direction.
-5. Validate syntax shape locally before claiming success.
-6. When working in this repository, run `.agents/skills/plantuml-diagram-author/scripts/validate_plantuml_attempt.py` or `plantuml-skill improve evaluate` if an eval run exists.
+5. For lifecycle requests, use a state diagram with explicit `state` declarations or `[*]` start/end transitions.
+6. Validate syntax shape locally before claiming success.
+7. When working in this repository, run `.agents/skills/plantuml-diagram-author/scripts/validate_plantuml_attempt.py` or `plantuml-skill improve evaluate` if an eval run exists.
 
 ## Include Policy
 
@@ -34,6 +35,7 @@ Read `references/output-contract.md` when the user needs a strict machine-readab
 - Do not use arbitrary remote `!includeurl`.
 - Use local or vendored includes only when the user asks for a notation that requires them, such as C4 macros.
 - If a C4 diagram uses macros, include an auditable local/vendored include or explain the expected include path in the surrounding workflow.
+- In this repository, use vendored C4 includes such as `!include C4_Container.puml`; do not hand-write replacement `Person`, `Container`, `System_Boundary`, or `Rel` procedures.
 
 Read `references/include-policy.md` before adding includes.
 

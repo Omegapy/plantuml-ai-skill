@@ -22,6 +22,7 @@ def write_codex_generation_prompt(run: ImprovementRun) -> Path:
         "",
         f"- run: `{run.id}`",
         f"- suite: `{run.suite_path}`",
+        "- local C4 include root: `data/vendor/c4-plantuml`",
         "",
         "## Cases",
         "",
@@ -37,12 +38,21 @@ def write_codex_generation_prompt(run: ImprovementRun) -> Path:
                 "",
                 f"- expected type: `{case.expected_diagram_type}`",
                 f"- include policy: `{case.include_policy}`",
+                *_case_guidance(case.expected_diagram_type, case.include_policy),
                 "",
             ]
         )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output
+
+
+def _case_guidance(expected_diagram_type: str, include_policy: str) -> list[str]:
+    if expected_diagram_type.lower() == "c4" and include_policy != "self_contained_only":
+        return [
+            "- C4 guidance: use the vendored include, for example `!include C4_Container.puml`; do not reimplement C4 macros inline.",
+        ]
+    return []
 
 
 def write_codex_next_prompt(run: ImprovementRun, clusters: list[FailureCluster]) -> Path:

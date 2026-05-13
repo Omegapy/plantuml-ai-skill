@@ -40,6 +40,32 @@ class ExtractionManifestTests(unittest.TestCase):
         self.assertEqual("c4", classify_diagram_type(c4))
         self.assertEqual("class", classify_diagram_type(class_diagram))
 
+    def test_classifies_state_diagram_before_sequence_arrows(self) -> None:
+        state_diagram = "\n".join(
+            [
+                "@startuml",
+                "state Draft",
+                "state Submitted",
+                "Draft --> Submitted : submit",
+                "Submitted --> [*]",
+                "@enduml",
+            ]
+        )
+        self.assertEqual("state", classify_diagram_type(state_diagram))
+
+    def test_classifies_sequence_with_database_participant(self) -> None:
+        sequence = "\n".join(
+            [
+                "@startuml",
+                "participant API",
+                "database Database",
+                "API -> Database : query",
+                "Database --> API : timeout",
+                "@enduml",
+            ]
+        )
+        self.assertEqual("sequence", classify_diagram_type(sequence))
+
     def test_include_parsing_marks_c4_dependency(self) -> None:
         c4 = (FIXTURES / "plantuml" / "c4_container.puml").read_text()
         includes = parse_include_deps(c4)

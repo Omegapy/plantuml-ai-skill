@@ -7,16 +7,25 @@ import unittest
 
 from plantuml_ai_skill.cli import main
 from plantuml_ai_skill.constants import PROJECT_ROOT
+from plantuml_ai_skill.improvement.cli import _include_roots
+from plantuml_ai_skill.improvement.state import INDEX_PATH
 
 
 class ImprovementCliTests(unittest.TestCase):
     def setUp(self) -> None:
         self.run_id = f"test-cli-{os.getpid()}"
         self.run_dir = PROJECT_ROOT / "data" / "improvement" / "runs" / self.run_id
+        self._original_index = INDEX_PATH.read_text(encoding="utf-8") if INDEX_PATH.exists() else None
 
     def tearDown(self) -> None:
         if self.run_dir.exists():
             shutil.rmtree(self.run_dir)
+        if self._original_index is None:
+            if INDEX_PATH.exists():
+                INDEX_PATH.unlink()
+        else:
+            INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+            INDEX_PATH.write_text(self._original_index, encoding="utf-8")
 
     def test_improvement_cli_smoke_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -97,6 +106,11 @@ class ImprovementCliTests(unittest.TestCase):
             self.assertEqual(0, main(["improve", "make-suite", "--output", str(suite), "--max-cases", "1"]))
             self.assertEqual(0, main(["improve", "begin-run", "--suite", str(suite), "--run-id", self.run_id]))
             self.assertEqual(0, main(["improve", "evaluate", "--run", self.run_id, "--allow-missing-attempts", "--no-render"]))
+
+    def test_improvement_evaluate_uses_configured_include_roots(self) -> None:
+        roots = _include_roots([])
+        self.assertIn(PROJECT_ROOT / "tests" / "fixtures" / "vendor" / "c4", roots)
+        self.assertIn(PROJECT_ROOT / "data" / "vendor" / "c4-plantuml", roots)
 
 
 def _fake_renderer(root: Path) -> tuple[Path, Path]:

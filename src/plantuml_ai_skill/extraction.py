@@ -95,12 +95,14 @@ def classify_diagram_type(puml_text: str) -> str:
         return "class"
     if re.search(r"^\s*(actor|usecase)\s+", puml_text, re.MULTILINE):
         return "usecase"
+    if re.search(r"^\s*state\s+\w+", puml_text, re.MULTILINE):
+        return "state"
+    if re.search(r"^\s*(?:\[\*\]\s*[-.]+>|\w+\s*[-.]+>\s*\[\*\])", puml_text, re.MULTILINE):
+        return "state"
     if re.search(r"[-.]+[ox*]?>|<[-.]+", puml_text):
         return "sequence"
     if re.search(r"^\s*(component|node|database|cloud)\s+", puml_text, re.MULTILINE):
         return "component"
-    if re.search(r"^\s*state\s+\w+", puml_text, re.MULTILINE):
-        return "state"
     if re.search(r"^\s*:\s*[^;]+;", puml_text, re.MULTILINE):
         return "activity"
     return "uml"

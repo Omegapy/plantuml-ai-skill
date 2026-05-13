@@ -109,11 +109,12 @@ def render_skill_markdown(context: SkillBuildContext) -> str:
             "2. Draft self-contained PlantUML first.",
             "3. Add participants/entities before relationships.",
             "4. Label important edges and outcomes.",
-            "5. Validate locally with the bundled script or `plantuml-skill improve evaluate` when a run exists.",
+            "5. For lifecycle requests, use explicit state syntax such as `state` declarations or `[*]` transitions.",
+            "6. Validate locally with the bundled script or `plantuml-skill improve evaluate` when a run exists.",
             "",
             "## Include Policy",
             "",
-            "Prefer no includes. Read `references/include-policy.md` before adding local/vendored includes. Never use arbitrary `!includeurl`.",
+            "Prefer no includes. Read `references/include-policy.md` before adding local/vendored includes. Never use arbitrary `!includeurl`. For C4 in this repo, use vendored includes instead of inline macro shims.",
             "",
             "## Current Lessons Learned",
             "",
@@ -241,11 +242,11 @@ def _diagram_family_reference() -> str:
 - Sequence: time-ordered calls, responses, callbacks, retries, errors.
 - Class: static types, fields, methods, inheritance, aggregation, composition.
 - Activity: workflows, branching, approvals, process steps.
-- State: lifecycle states and event-driven transitions.
+- State: lifecycle states and event-driven transitions; use explicit state declarations or `[*]` transitions.
 - Use case: actors and goals around a system boundary.
 - Component: modules, services, databases, dependencies.
 - Deployment: nodes, runtimes, infrastructure placement.
-- C4: architecture context/container/component views; requires include policy care.
+- C4: architecture context/container/component views; use vendored C4 includes, not hand-written macro shims.
 """
 
 
@@ -254,7 +255,7 @@ def _include_policy_reference() -> str:
 
 Prefer self-contained PlantUML.
 
-Allowed includes must be local, vendored, and auditable. Block arbitrary HTTP/HTTPS `!includeurl` usage. Use C4 includes only when C4 notation is requested or clearly needed.
+Allowed includes must be local, vendored, and auditable. Block arbitrary HTTP/HTTPS `!includeurl` usage. Use C4 includes only when C4 notation is requested or clearly needed. In this repo, prefer `!include C4_Container.puml` for C4 container views and do not redefine C4 macros inline.
 """
 
 
@@ -277,6 +278,17 @@ Client -> API: request
 API -> Database: query
 Database --> API: timeout
 API --> Client: error response
+@enduml
+```
+
+```plantuml
+@startuml
+!include C4_Container.puml
+Person(user, "User")
+System_Boundary(system, "Diagram Service") {
+  Container(api, "API", "Python/FastAPI")
+}
+Rel(user, api, "Uses")
 @enduml
 ```
 """

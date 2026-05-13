@@ -46,3 +46,7 @@ Model judging can be added later, but it should remain opt-in.
 ## Promotion
 
 `plantuml-skill improve promote` reports gate status. It blocks promotion when tests are not recorded as passed, human approval is missing, remote include violations exist, render rate regresses, semantic metrics fail the configured gate, or protected regressions are recorded.
+
+The command is a gate decision, not a publisher. It writes `promotion-decision.json` into the run directory and exits successfully only when the candidate is approved by the gate. It does not install the skill, copy files to another location, create a release, or tag the repository.
+
+Generated run state and approval files under `data/improvement/` are intentionally ignored by git. When a promotion outcome needs to be durable in the repository, record a concise tracked audit note under `docs/implementation/` instead of force-adding ignored run artifacts.

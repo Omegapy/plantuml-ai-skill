@@ -52,6 +52,22 @@ class ReportingTests(unittest.TestCase):
                     render_fail_reason="remote_include_blocked",
                 ),
                 record(
+                    id="mirrored",
+                    include_deps=[
+                        "https://raw.githubusercontent.com/plantuml-stdlib/"
+                        "C4-PlantUML/master/C4_Container.puml"
+                    ],
+                    uses_include=True,
+                    is_self_contained=False,
+                    extra={
+                        "include_resolution_status": "trusted_remote_mirrored",
+                        "mirrored_include_deps": [
+                            "https://raw.githubusercontent.com/plantuml-stdlib/"
+                            "C4-PlantUML/master/C4_Container.puml"
+                        ],
+                    },
+                ),
+                record(
                     id="mismatch",
                     published_render_path="diagram.png",
                     verification_status="png_mismatch",
@@ -66,6 +82,8 @@ class ReportingTests(unittest.TestCase):
         )
         self.assertIn("### remote_include_blocked", report)
         self.assertIn("`remote`", report)
+        self.assertIn("### trusted_remote_includes_mirrored", report)
+        self.assertIn("`mirrored`", report)
         self.assertIn("### png_svg_mismatches", report)
         self.assertIn("`mismatch`", report)
         self.assertIn("### license_policy_exclusions", report)

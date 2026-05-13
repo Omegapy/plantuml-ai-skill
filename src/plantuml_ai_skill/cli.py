@@ -11,16 +11,17 @@ from .acquisition import acquire_source, ensure_generated_dirs, vendor_include_s
 from .assets import init_assets
 from .config import load_sources_config
 from .constants import DEFAULT_JAR_PATH, PROJECT_ROOT
+from .contact_sheet import write_png_mismatch_contact_sheet
 from .doctor import run_doctor
 from .extraction import extract_from_tree, extract_plantuml_blocks
-from .includes import inline_resolved_includes, resolve_include_deps, unresolved_include_reason
+from .includes import inline_resolved_includes, resolve_include_deps, unresolved_resolution_reason
 from .license_policy import training_block_reason
 from .manifest import CorpusRecord, read_jsonl, write_jsonl
 from .recommendation_coverage import check_recommendation_coverage
 from .renderer import PlantUMLRenderer, render_version_label
 from .reporting import write_report
 from .splits import build_splits
-from .verify import png_average_hash, png_perceptual_match, svg_hash, svg_matches
+from .verify import png_average_hash, png_dimensions, png_hash_distance, png_perceptual_match, svg_hash, svg_matches
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -82,6 +83,14 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--manifest", required=True)
     report.add_argument("--output", default=str(PROJECT_ROOT / "data" / "reports" / "corpus-report.md"))
 
+    contact = sub.add_parser("png-contact-sheet", help="write an HTML contact sheet for PNG mismatches")
+    contact.add_argument("--manifest", required=True)
+    contact.add_argument("--source-root", default="")
+    contact.add_argument(
+        "--output",
+        default=str(PROJECT_ROOT / "data" / "reports" / "png-mismatch-contact-sheet.html"),
+    )
+
     coverage = sub.add_parser("coverage", help="check report recommendation coverage")
     coverage.add_argument("--config", default=str(PROJECT_ROOT / "config" / "sources.yml"))
     coverage.add_argument("--json", action="store_true")
@@ -122,6 +131,11 @@ def main(argv: list[str] | None = None) -> int:
             records = read_jsonl(args.manifest)
             path = write_report(records, args.output)
             print(f"Wrote report: {path}")
+            return 0
+        if args.command == "png-contact-sheet":
+            records = read_jsonl(args.manifest)
+            path, count = write_png_mismatch_contact_sheet(records, args.output, args.source_root or None)
+            print(f"Wrote {count} PNG mismatch rows to {path}")
             return 0
         if args.command == "coverage":
             return _coverage(args)
@@ -175,18 +189,28 @@ def _render(args: argparse.Namespace) -> int:
     for record in records:
         try:
             puml_path = _resolve_record_path(record, args.source_root)
-            include_reason = unresolved_include_reason(record.include_deps, include_roots, puml_path.parent)
+            include_resolutions = (
+                resolve_include_deps(record.include_deps, include_roots, puml_path.parent)
+                if record.include_deps
+                else []
+            )
+            include_reason = unresolved_resolution_reason(include_resolutions)
             if include_reason:
                 record.render_status = "skipped"
                 record.render_fail_reason = include_reason
                 updated.append(record)
                 continue
+            mirrored = [
+                resolution.target
+                for resolution in include_resolutions
+                if resolution.reason == "trusted_remote_mirrored"
+            ]
+            if mirrored:
+                record.extra["include_resolution_status"] = "trusted_remote_mirrored"
+                record.extra["mirrored_include_deps"] = mirrored
             puml_text = _puml_text_for_record(record, puml_path)
             if record.include_deps:
-                puml_text = inline_resolved_includes(
-                    puml_text,
-                    resolve_include_deps(record.include_deps, include_roots, puml_path.parent),
-                )
+                puml_text = inline_resolved_includes(puml_text, include_resolutions)
             result = renderer.render_svg(puml_text)
             if result.ok:
                 svg_path = render_dir / f"{record.id}.svg"
@@ -243,9 +267,15 @@ def _verify(args: argparse.Namespace) -> int:
                     )
                 elif reference_path.suffix.lower() == ".png":
                     rendered_path = _rendered_output_path(record, "png")
+                    rendered_bytes = rendered_path.read_bytes()
+                    reference_bytes = reference_path.read_bytes()
+                    distance = png_hash_distance(rendered_bytes, reference_bytes)
+                    record.extra["png_hash_distance"] = str(distance)
+                    record.extra["rendered_png_dimensions"] = _dimensions_label(png_dimensions(rendered_bytes))
+                    record.extra["published_png_dimensions"] = _dimensions_label(png_dimensions(reference_bytes))
                     record.verification_status = (
                         "png_match"
-                        if png_perceptual_match(rendered_path.read_bytes(), reference_path.read_bytes())
+                        if png_perceptual_match(rendered_bytes, reference_bytes)
                         else "png_mismatch"
                     )
                 else:
@@ -346,6 +376,10 @@ def _puml_text_for_record(record: CorpusRecord, puml_path: Path) -> str:
     if block_index >= len(blocks):
         raise IndexError(f"block_index {block_index} out of range for {puml_path}")
     return blocks[block_index]
+
+
+def _dimensions_label(dimensions: tuple[int, int]) -> str:
+    return f"{dimensions[0]}x{dimensions[1]}"
 
 
 def _include_roots(extra_roots: list[str]) -> list[Path]:

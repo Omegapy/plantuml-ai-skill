@@ -78,7 +78,14 @@ class PlantUMLRenderer:
         return result
 
     def testdot(self) -> RenderResult:
-        command = [self.java_bin, "-jar", str(self.jar_path), "-testdot"]
+        command = [
+            self.java_bin,
+            "-Djava.awt.headless=true",
+            "-DPLANTUML_SECURITY_PROFILE=SANDBOX",
+            "-jar",
+            str(self.jar_path),
+            "-testdot",
+        ]
         return self._run(command, input_text="")
 
     def command_for(self, output_format: str) -> list[str]:

@@ -61,6 +61,36 @@ class ExtractionManifestTests(unittest.TestCase):
             unresolved_include_reason(["https://example.com/remote.puml"], [FIXTURES / "vendor" / "c4"]),
         )
 
+    def test_trusted_c4_remote_include_maps_to_vendored_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            include = root / "C4_Container.puml"
+            include.write_text("' vendored C4\n", encoding="utf-8")
+            resolutions = resolve_include_deps(
+                [
+                    "https://raw.githubusercontent.com/plantuml-stdlib/"
+                    "C4-PlantUML/master/C4_Container.puml"
+                ],
+                [root],
+            )
+        self.assertTrue(resolutions[0].resolved_path)
+        self.assertEqual("trusted_remote_mirrored", resolutions[0].reason)
+
+    def test_trusted_c4_remote_include_uses_vendor_roots_not_source_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source_dir = Path(tmp)
+            (source_dir / "C4_Container.puml").write_text("' untrusted source copy\n", encoding="utf-8")
+            resolutions = resolve_include_deps(
+                [
+                    "https://raw.githubusercontent.com/plantuml-stdlib/"
+                    "C4-PlantUML/master/C4_Container.puml"
+                ],
+                [],
+                source_dir,
+            )
+        self.assertIsNone(resolutions[0].resolved_path)
+        self.assertEqual("remote_include_blocked", resolutions[0].reason)
+
     def test_include_rewrite_uses_absolute_local_paths(self) -> None:
         resolutions = resolve_include_deps(["c4_fixture_container_include.puml"], [FIXTURES / "vendor" / "c4"])
         rewritten = rewrite_includes_to_local_paths(

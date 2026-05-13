@@ -40,7 +40,7 @@ C4-PlantUML includes can be vendored from the pinned source registry entry:
 plantuml-skill vendor-includes --source c4-plantuml --output data/vendor/c4-plantuml --force
 ```
 
-Records that still use remote C4 URLs are reported as `remote_include_blocked` until a curator rewrites or maps those includes to the vendored snapshot.
+Known C4-PlantUML URLs of the form `https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/<include>.puml` are mapped to the pinned local C4 vendor snapshot. This mapping is intentionally narrow: arbitrary remote includes are still reported as `remote_include_blocked`.
 
 ## SVG Comparison
 
@@ -50,7 +50,13 @@ This avoids false mismatches from volatile SVG identifiers without pretending th
 
 ## PNG Fallback
 
-PNG comparison is a fallback for sources that publish only raster references. The stdlib implementation decodes 8-bit grayscale, RGB, RGBA, and indexed-color PNGs, computes an average hash, and compares Hamming distance. It is intentionally secondary to SVG comparison.
+PNG comparison is a fallback for sources that publish only raster references. The stdlib implementation decodes 8-bit grayscale, RGB, RGBA, and indexed-color PNGs, computes an average hash, and compares Hamming distance. Verified records retain PNG hash distance and published/rendered dimensions in manifest metadata so curators can distinguish small drift from obvious mismatches. It is intentionally secondary to SVG comparison.
+
+For visual review, generate a side-by-side HTML contact sheet for PNG mismatches:
+
+```bash
+plantuml-skill png-contact-sheet --manifest data/manifests/plantuml-examples-verified.jsonl --output data/reports/plantuml-examples-png-contact-sheet.html
+```
 
 Some PlantUML diagram families emit status chatter before piped SVG/PNG bytes. The renderer strips that prefix before hashing or decoding so valid diagrams are not mislabeled as renderer failures.
 

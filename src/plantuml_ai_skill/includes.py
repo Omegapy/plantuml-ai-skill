@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import re
+from urllib.parse import urlparse
 
 
 INCLUDE_RE = re.compile(
@@ -12,12 +13,13 @@ INCLUDE_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 INCLUDE_LINE_RE = re.compile(
-    r"^(?P<prefix>\s*!(?:include|include_many|include_once)\s+)(?P<quote>['\"]?)(?P<target>\S+?)(?P=quote)(?P<suffix>\s*(?:'.*)?)$",
+    r"^(?P<prefix>\s*!(?:include|includeurl|include_many|include_once)\s+)(?P<quote>['\"]?)(?P<target>\S+?)(?P=quote)(?P<suffix>\s*(?:'.*)?)$",
     re.IGNORECASE,
 )
 
 ICON_LIBRARY_HINTS = ("aws", "azure", "gcp", "k8s", "kubernetes", "material", "font-awesome")
 C4_HINTS = ("c4_", "c4-", "c4/")
+TRUSTED_C4_REMOTE_PREFIX = "/plantuml-stdlib/C4-PlantUML/master/"
 
 
 @dataclass(frozen=True)
@@ -62,18 +64,25 @@ def resolve_include_deps(
 ) -> list[IncludeResolution]:
     """Resolve includes against local source and vendor roots.
 
-    Remote includes are intentionally not resolved; batch rendering should only
-    use local, auditable include trees.
+    Arbitrary remote includes are intentionally not resolved; batch rendering
+    should only use local, auditable include trees. A small allowlist maps
+    PlantUML-Examples' historical C4-PlantUML ``master`` URLs to the pinned
+    local C4 vendor snapshot.
     """
 
-    roots = [Path(root) for root in include_roots]
+    vendor_roots = [Path(root) for root in include_roots]
+    roots = list(vendor_roots)
     if source_dir:
         roots.insert(0, Path(source_dir))
     resolutions: list[IncludeResolution] = []
     for dep in include_deps:
         target = dep.strip().strip('"').strip("'")
         if is_remote_include(target):
-            resolutions.append(IncludeResolution(dep, None, "remote_include_blocked"))
+            trusted_remote = _trusted_remote_include_path(target, vendor_roots)
+            if trusted_remote:
+                resolutions.append(IncludeResolution(dep, trusted_remote.resolve(), "trusted_remote_mirrored"))
+            else:
+                resolutions.append(IncludeResolution(dep, None, "remote_include_blocked"))
             continue
         if target.startswith("<") and target.endswith(">"):
             target = target[1:-1]
@@ -188,6 +197,17 @@ def unresolved_include_reason(
     return "include_resolution_required"
 
 
+def unresolved_resolution_reason(resolutions: list[IncludeResolution]) -> str:
+    """Summarize why a resolved dependency list still contains gaps."""
+
+    unresolved = [resolution for resolution in resolutions if resolution.resolved_path is None]
+    if not unresolved:
+        return ""
+    if any(resolution.reason == "remote_include_blocked" for resolution in unresolved):
+        return "remote_include_blocked"
+    return "include_resolution_required"
+
+
 def _include_candidates(target: str, roots: list[Path]) -> list[Path]:
     target_path = Path(target)
     names = [target_path]
@@ -205,3 +225,16 @@ def _include_candidates(target: str, roots: list[Path]) -> list[Path]:
 
 def _normalize_include_target(target: str) -> str:
     return target.strip().strip('"').strip("'")
+
+
+def _trusted_remote_include_path(target: str, roots: list[Path]) -> Path | None:
+    parsed = urlparse(target)
+    if parsed.scheme != "https" or parsed.netloc.lower() != "raw.githubusercontent.com":
+        return None
+    if not parsed.path.startswith(TRUSTED_C4_REMOTE_PREFIX):
+        return None
+    relative = parsed.path.removeprefix(TRUSTED_C4_REMOTE_PREFIX)
+    if "/" in relative or not relative.lower().endswith((".puml", ".iuml")):
+        return None
+    candidates = _include_candidates(relative, roots)
+    return next((candidate for candidate in candidates if candidate.exists()), None)

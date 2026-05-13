@@ -77,6 +77,11 @@ def png_perceptual_match(left: bytes, right: bytes, max_distance: int = 5) -> bo
     return png_hash_distance(left, right) <= max_distance
 
 
+def png_dimensions(png_bytes: bytes) -> tuple[int, int]:
+    width, height, _ = _decode_png_grayscale(png_bytes)
+    return width, height
+
+
 def _decode_png_grayscale(png_bytes: bytes) -> tuple[int, int, list[int]]:
     if not png_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
         raise ValueError("not a PNG file")

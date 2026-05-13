@@ -50,6 +50,16 @@ def write_report(
 def _diagnostics_section(records: list[CorpusRecord]) -> list[str]:
     groups: list[tuple[str, str, str, list[tuple[CorpusRecord, str]]]] = [
         (
+            "trusted_remote_includes_mirrored",
+            "trusted C4 remote include mapped to the pinned local vendor snapshot",
+            "eligible for normal render triage; keep the mirror rule auditable",
+            [
+                (record, ", ".join(record.extra.get("mirrored_include_deps", [])))
+                for record in records
+                if record.extra.get("include_resolution_status") == "trusted_remote_mirrored"
+            ],
+        ),
+        (
             "remote_include_blocked",
             "valid PlantUML but unsupported remote include dependency",
             "exclude until the include is vendored or explicitly mapped",
@@ -84,7 +94,7 @@ def _diagnostics_section(records: list[CorpusRecord]) -> list[str]:
             "published image differs from the pinned renderer output",
             "exclude from trusted visual regression until reviewed or rebaselined",
             [
-                (record, record.published_render_path)
+                (record, _visual_mismatch_detail(record))
                 for record in records
                 if record.verification_status in {"png_mismatch", "svg_mismatch"}
             ],
@@ -173,6 +183,19 @@ def _source_paths_cell(paths: list[str]) -> str:
         return ", ".join(f"`{path}`" for path in paths)
     shown = ", ".join(f"`{path}`" for path in paths[:3])
     return f"{shown}, +{len(paths) - 3} more"
+
+
+def _visual_mismatch_detail(record: CorpusRecord) -> str:
+    parts = [record.published_render_path]
+    if record.extra.get("png_hash_distance"):
+        parts.append(f"hash_distance={record.extra['png_hash_distance']}")
+    if record.extra.get("published_png_dimensions") and record.extra.get("rendered_png_dimensions"):
+        parts.append(
+            "dimensions="
+            f"{record.extra['published_png_dimensions']} published/"
+            f"{record.extra['rendered_png_dimensions']} rendered"
+        )
+    return "; ".join(parts)
 
 
 def _markdown_table(headers: list[str], rows: list[list[str]]) -> list[str]:

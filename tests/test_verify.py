@@ -3,7 +3,7 @@ import struct
 import unittest
 import zlib
 
-from plantuml_ai_skill.verify import png_perceptual_match, svg_hash, svg_matches
+from plantuml_ai_skill.verify import png_dimensions, png_perceptual_match, svg_hash, svg_matches
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +46,7 @@ class VerifyTests(unittest.TestCase):
 
     def test_png_average_hash_fallback_matches_similar_simple_pngs(self) -> None:
         self.assertTrue(png_perceptual_match(tiny_png(200), tiny_png(201)))
+        self.assertEqual((2, 2), png_dimensions(tiny_png(200)))
 
 
 if __name__ == "__main__":

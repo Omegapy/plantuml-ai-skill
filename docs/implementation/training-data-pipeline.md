@@ -91,10 +91,13 @@ plantuml-skill vendor-includes --source c4-plantuml --output data/vendor/c4-plan
 
 The command stages the pinned source through the source registry, then copies `.puml` and `.iuml` files while preserving relative paths. Local include inlining is recursive, so C4 files that include other local C4 files can render through the pinned vendor snapshot without network access during rendering.
 
+The renderer has a narrow trusted mirror rule for historical C4-PlantUML raw GitHub URLs. Known URLs under `plantuml-stdlib/C4-PlantUML/master/` resolve to the pinned local vendor snapshot; arbitrary remote includes remain blocked.
+
 ## Reporting
 
 `plantuml-skill report` writes curator-oriented Markdown. In addition to summary counts, it groups:
 
+- trusted remote includes mirrored to local vendor files
 - `remote_include_blocked`
 - `include_resolution_required`
 - renderer failures
@@ -103,6 +106,8 @@ The command stages the pinned source through the source registry, then copies `.
 - records excluded from training by license policy
 
 For source-conditioned records, the report also lists expected `.puml` paths, paired Python source paths, render status, and source-pairing confidence.
+
+For visual PNG review, `plantuml-skill png-contact-sheet` copies published/rendered mismatch pairs into a report assets folder and writes a side-by-side HTML sheet.
 
 ## Real-Source Smoke Coverage
 

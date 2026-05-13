@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlantUML Skill Eval Case",
+  "type": "object",
+  "required": [
+    "id",
+    "suite",
+    "prompt",
+    "expected_diagram_type",
+    "required_patterns",
+    "forbidden_patterns",
+    "required_edges",
+    "include_policy"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "suite": { "type": "string", "minLength": 1 },
+    "prompt": { "type": "string", "minLength": 1 },
+    "expected_diagram_type": { "type": "string", "minLength": 1 },
+    "required_patterns": { "type": "array", "items": { "type": "string" } },
+    "forbidden_patterns": { "type": "array", "items": { "type": "string" } },
+    "required_edges": { "type": "array" },
+    "include_policy": { "type": "string", "minLength": 1 },
+    "reference_record_id": { "type": "string" },
+    "purpose": { "type": "array", "items": { "type": "string" } },
+    "difficulty": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "allow_multiple_blocks": { "type": "boolean" },
+    "hidden": { "type": "boolean" },
+    "source_context": { "type": "string" }
+  }
+}

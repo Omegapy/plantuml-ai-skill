@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "source_name": "plantuml-examples-mattjhayes",
+  "reviewer": "codex",
+  "reviewed_at": "2026-05-13",
+  "status_policy": {
+    "minor_acceptable_drift": "May enter gold_eval; still excluded from renderer_regression.",
+    "renderer_version_drift": "Reviewed but excluded from high-trust splits.",
+    "published_image_drift": "Reviewed but excluded from high-trust splits.",
+    "suspicious_pairing": "Excluded pending manual repair.",
+    "true_regression": "Excluded pending renderer or source triage."
+  },
+  "decisions": [
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-54ae520e3f07",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same title example; drift is limited to default object styling, shadow, and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-2-bb9aeb1b826b",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same header example; drift is limited to default object styling, shadow, and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-3-3d081726b7a5",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same footer example; drift is limited to default object styling, shadow, and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-4-5d6974505a38",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same note text and connector; drift is limited to note border color and styling."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-5-adecb5a9c5c4",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same caption example; drift is limited to default object styling, shadow, and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-6-b08f410f64aa",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same legend text and interface marker; drift is limited to default styling and placement."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-activity-diagram-58cfb62fb3d9",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same activity flow and labels; drift is limited to small sizing and endpoint styling."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-c4-model-component-diagram-b0bb836848cb",
+      "applies_to": "png_mismatch",
+      "status": "published_image_drift",
+      "rationale": "Diagram depends on a historical remote C4 include; rendered output uses the pinned local C4 vendor snapshot."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-c4-model-container-diagram-c4440fe4df22",
+      "applies_to": "png_mismatch",
+      "status": "published_image_drift",
+      "rationale": "Diagram depends on a historical remote C4 include; rendered output uses the pinned local C4 vendor snapshot."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-class-diagram-443a21d5f219",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same classes, inheritance edges, and legend; drift is limited to layout spacing and default styling."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-component-diagram-f54cf142ea78",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same components, interfaces, note, and dependencies; drift is limited to layout spacing and styling."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-deployment-like-diagram-c122984b96dc",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Same deployment groups and nodes, but the pinned renderer produces materially different Graphviz layout."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-sequence-another-example-fe9e21dae589",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same participants, messages, and note; drift is limited to default styling and small layout changes."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-sequence-participants-theme-fb56bf8948e9",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer adds bottom participant markers and changes sequence layout relative to the published image."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-sequence-simple-9ab7d90189b7",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same participants and TCP handshake messages; drift is limited to default styling and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-use-case-diagram-dab36c100105",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same actors, use cases, labels, and note; drift is limited to routing, spacing, and default styling."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-2-cf97fd18a32a",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer emits the handwritten option compatibility banner, changing the published layout."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-3-8c5ed3d64b3b",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer emits the handwritten option compatibility banner, changing the published layout."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-5-d89d312e6086",
+      "applies_to": "png_mismatch",
+      "status": "published_image_drift",
+      "rationale": "Diagram depends on a historical remote C4 include; rendered output uses the pinned local C4 vendor snapshot."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-hidden-lines-3bfd97567c4e",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same component graph and edges; drift is limited to default component styling and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-hidden-lines-2-58617b903f9e",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same component graph and hidden-line effect; drift is limited to default styling and spacing."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-other-layout-tricks-f6734d518e97",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer changes handwritten layout ordering and emits the handwritten option compatibility banner."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-other-layout-tricks-2-7fe3245e7ab9",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer changes handwritten layout ordering and emits the handwritten option compatibility banner."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-other-layout-tricks-3-e80d09c2aea1",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same components and standard line routing; drift is limited to spacing and default styling."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-9d5cd1cccb45",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same vertical line examples; drift is limited to endpoint color, shadow, and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-2-5710a348a52c",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same dashed vertical line examples; drift is limited to endpoint color, shadow, and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-3-1a882f15c8cd",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same horizontal line examples; drift is limited to endpoint color, shadow, and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-4-1d825bed3f32",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer lays the colored interface links horizontally instead of the older vertical arrangement."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-5-27f9f00d97a2",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer lays the default-colored interface links horizontally instead of the older vertical arrangement."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-1fed8e76853b",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same component object; drift is limited to default component styling."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-2-2b26f9ea0b49",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer omits the interface label that appears in the older published image for the same source."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-3-f024b629bd03",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same rectangle label; drift is limited to default fill, shadow, and text weight."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-4-14ddef4696b2",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same rectangle contents and labels; drift is limited to default styling and internal spacing."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-5-4aac40ab6094",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same actor label and shape; drift is limited to default actor styling."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-6-9c2d3f169548",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same two actor labels and shapes; drift is limited to default actor styling and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-readme-7-76ee9c5e7823",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same artifact label and icon; drift is limited to default artifact styling."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-colors-2-004210579d8f",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same skinparam color example; drift is limited to shadow, text weight, and small dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-colors-3-95adc3c47b44",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same single-item color example; drift is limited to shadow, text weight, and small dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-fonts-c263f873d4ba",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer emits the handwritten option compatibility banner, changing the published layout."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-styles-fa6a1ef24cf0",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same default style shape and edges; drift is limited to line color, endpoint styling, and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-styles-2-ad77d3d19086",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same monochrome style shape and edges; drift is limited to endpoint styling and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-styles-3-5aedf7ca6a72",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same reverse-monochrome style shape and edges; drift is limited to endpoint styling and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-styles-4-5db9ffbe23af",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer emits the handwritten option compatibility banner, changing the published layout."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-styles-5-595061425f61",
+      "applies_to": "png_mismatch",
+      "status": "renderer_version_drift",
+      "rationale": "Pinned renderer emits the handwritten option compatibility banner, changing the published layout."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-styles-6-ca369abd9642",
+      "applies_to": "png_mismatch",
+      "status": "minor_acceptable_drift",
+      "rationale": "Same no-shadow style shape and edges; drift is limited to line color, endpoint styling, and dimensions."
+    },
+    {
+      "record_id": "plantuml-examples-mattjhayes-mind-map-b65ceb0c9037",
+      "applies_to": "render_failure",
+      "status": "renderer_version_drift",
+      "rationale": "Raw source is unaltered; PlantUML 1.2026.3 rejects style mindmapDiagram, while removing only that style block renders."
+    }
+  ]
+}

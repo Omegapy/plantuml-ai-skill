@@ -51,6 +51,7 @@ def _row_html(record: CorpusRecord, reference_src: Path, rendered_src: Path) -> 
             if record.extra.get("published_png_dimensions")
             else "",
             f"rendered {record.extra.get('rendered_png_dimensions')}" if record.extra.get("rendered_png_dimensions") else "",
+            f"reviewed {record.extra.get('curation_status')}" if record.extra.get("curation_status") else "",
         )
         if item
     )

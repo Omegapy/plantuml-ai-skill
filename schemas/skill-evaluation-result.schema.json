@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlantUML Skill Evaluation Result",
+  "type": "object",
+  "required": [
+    "attempt_id",
+    "case_id",
+    "extract_status",
+    "syntax_status",
+    "diagram_type_status",
+    "include_policy_status",
+    "render_status",
+    "semantic_status",
+    "output_contract_status",
+    "score",
+    "failures"
+  ],
+  "properties": {
+    "attempt_id": { "type": "string", "minLength": 1 },
+    "case_id": { "type": "string", "minLength": 1 },
+    "extract_status": { "type": "string", "minLength": 1 },
+    "syntax_status": { "type": "string", "minLength": 1 },
+    "diagram_type_status": { "type": "string", "minLength": 1 },
+    "include_policy_status": { "type": "string", "minLength": 1 },
+    "render_status": { "type": "string", "minLength": 1 },
+    "semantic_status": { "type": "string", "minLength": 1 },
+    "output_contract_status": { "type": "string", "minLength": 1 },
+    "score": { "type": "number" },
+    "failures": { "type": "array" },
+    "render_hash_svg": { "type": "string" },
+    "rendered_svg_path": { "type": "string" }
+  }
+}

@@ -37,6 +37,8 @@ The fixture source is fully runnable without network access:
 plantuml-skill acquire --source fixtures --output data/manifests/fixtures.jsonl
 ```
 
+This project is maintained as a local-only pipeline. Use the local verification commands in `docs/implementation/verification.md` as the quality gate; no GitHub Actions workflow or GitHub CLI authentication is required.
+
 ## Extraction And Annotation
 
 Extraction supports:
@@ -79,7 +81,7 @@ Required metadata includes:
 - source-conditioned Python cases get their own split;
 - synthetic records are capped before entering augmentation.
 
-High-trust splits (`train`, `gold_eval`, `renderer_regression`, and `source_conditioned_eval`) also apply promotion gates. A record is blocked if it has an unknown or mixed license, unresolved or remote includes, ambiguous published-render pairing, a failed or skipped render, or a PNG/SVG verification mismatch. This keeps curator-only diagnostics from silently entering trusted evaluation or training outputs.
+High-trust splits (`train`, `gold_eval`, `renderer_regression`, and `source_conditioned_eval`) also apply promotion gates. A record is blocked if it has an unknown or mixed license, unresolved or remote includes, ambiguous published-render pairing, a failed or skipped render, or an unreviewed PNG/SVG verification mismatch. Reviewed visual mismatches are still blocked unless the curation policy explicitly permits that status for the target split. Today only `minor_acceptable_drift` may enter `gold_eval`; reviewed renderer-version drift, published-image drift, suspicious pairings, and true regressions remain excluded from high-trust promotion.
 
 ## Include Vendoring
 
@@ -109,6 +111,8 @@ For source-conditioned records, the report also lists expected `.puml` paths, pa
 
 For visual PNG review, `plantuml-skill png-contact-sheet` copies published/rendered mismatch pairs into a report assets folder and writes a side-by-side HTML sheet.
 
+Curator decisions live in tracked JSON under `config/curation/`. The CLI applies that directory automatically when writing reports, contact sheets, or splits, so regenerated manifests do not require re-reviewing every known mismatch. Each decision records the target record id, the diagnostic it applies to, a status, and a short rationale.
+
 ## Real-Source Smoke Coverage
 
 The first external smoke target is `plantuml-examples-mattjhayes`, pinned in `config/sources.yml` to a concrete commit. This source is small, permissively licensed, and varied enough to test Markdown extraction, published PNG references, renderer failures, and remote include blocking.
@@ -122,6 +126,8 @@ plantuml-skill verify --manifest data/manifests/plantuml-examples-rendered.jsonl
 ```
 
 Non-green records are still valuable. They identify syntax incompatibilities, renderer drift, remote include dependencies, and PNG reference mismatches that should be curated before records are promoted into gold evaluation.
+
+The current PlantUML-Examples curation file classifies all `png_mismatch` rows. Simple style, shadow, font, and minor routing differences are marked `minor_acceptable_drift`; C4 rows whose historical remote includes are rendered through the pinned local vendor snapshot are marked `published_image_drift`; visible compatibility banners, major layout changes, and old renderer behavior are marked `renderer_version_drift`.
 
 `py2puml` is also pinned and smoke-tested as a source-conditioned corpus. Acquisition pairs expected `.puml` files with nearby Python files, then keeps those records in `source_conditioned_eval`:
 

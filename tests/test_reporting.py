@@ -71,6 +71,10 @@ class ReportingTests(unittest.TestCase):
                     id="mismatch",
                     published_render_path="diagram.png",
                     verification_status="png_mismatch",
+                    extra={
+                        "curation_status": "minor_acceptable_drift",
+                        "curation_rationale": "same diagram with small styling drift",
+                    },
                 ),
                 record(
                     id="blocked-license",
@@ -86,6 +90,7 @@ class ReportingTests(unittest.TestCase):
         self.assertIn("`mirrored`", report)
         self.assertIn("### png_svg_mismatches", report)
         self.assertIn("`mismatch`", report)
+        self.assertIn("reviewed=minor_acceptable_drift", report)
         self.assertIn("### license_policy_exclusions", report)
         self.assertIn("blocked_copyleft_license", report)
 

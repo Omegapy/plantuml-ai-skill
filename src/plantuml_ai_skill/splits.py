@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
+from .curation import GOLD_EVAL_ALLOWED_VISUAL_CURATION_STATUSES
 from .license_policy import training_block_reason
 from .manifest import CorpusRecord, write_jsonl
 
@@ -16,6 +17,7 @@ UNRESOLVED_INCLUDE_REASONS = {
     "include_roots_not_configured",
 }
 MISMATCH_VERIFICATION_STATUSES = {"png_mismatch", "svg_mismatch", "verify_error", "unsupported_reference_format"}
+VISUAL_MISMATCH_VERIFICATION_STATUSES = {"png_mismatch", "svg_mismatch"}
 
 
 def build_splits(
@@ -86,6 +88,16 @@ def promotion_block_reason(record: CorpusRecord, split_name: str) -> str:
         return "render_failed"
     if record.render_status == "skipped":
         return record.render_fail_reason or "render_skipped"
+    if record.verification_status in VISUAL_MISMATCH_VERIFICATION_STATUSES:
+        status = str(record.extra.get("curation_status", ""))
+        applies_to = str(record.extra.get("curation_applies_to", ""))
+        if (
+            split_name == "gold_eval"
+            and applies_to == record.verification_status
+            and status in GOLD_EVAL_ALLOWED_VISUAL_CURATION_STATUSES
+        ):
+            return ""
+        return f"{record.verification_status}_{status or 'unreviewed'}"
     if record.verification_status in MISMATCH_VERIFICATION_STATUSES:
         return record.verification_status
     return ""

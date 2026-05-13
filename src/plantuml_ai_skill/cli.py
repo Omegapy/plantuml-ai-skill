@@ -12,6 +12,7 @@ from .assets import init_assets
 from .config import load_sources_config
 from .constants import DEFAULT_JAR_PATH, PROJECT_ROOT
 from .contact_sheet import write_png_mismatch_contact_sheet
+from .curation import DEFAULT_CURATION_PATH, apply_curation, load_curation_decisions
 from .doctor import run_doctor
 from .extraction import extract_from_tree, extract_plantuml_blocks
 from .includes import inline_resolved_includes, resolve_include_deps, unresolved_resolution_reason
@@ -22,6 +23,7 @@ from .renderer import PlantUMLRenderer, render_version_label
 from .reporting import write_report
 from .splits import build_splits
 from .verify import png_average_hash, png_dimensions, png_hash_distance, png_perceptual_match, svg_hash, svg_matches
+from .improvement.cli import add_improve_parser, dispatch as dispatch_improve
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -78,14 +80,17 @@ def build_parser() -> argparse.ArgumentParser:
     splits.add_argument("--manifest", required=True)
     splits.add_argument("--output-dir", default=str(PROJECT_ROOT / "data" / "manifests" / "splits"))
     splits.add_argument("--synthetic-cap", type=int, default=5000)
+    splits.add_argument("--curation", default=str(DEFAULT_CURATION_PATH))
 
     report = sub.add_parser("report", help="write a Markdown corpus report")
     report.add_argument("--manifest", required=True)
     report.add_argument("--output", default=str(PROJECT_ROOT / "data" / "reports" / "corpus-report.md"))
+    report.add_argument("--curation", default=str(DEFAULT_CURATION_PATH))
 
     contact = sub.add_parser("png-contact-sheet", help="write an HTML contact sheet for PNG mismatches")
     contact.add_argument("--manifest", required=True)
     contact.add_argument("--source-root", default="")
+    contact.add_argument("--curation", default=str(DEFAULT_CURATION_PATH))
     contact.add_argument(
         "--output",
         default=str(PROJECT_ROOT / "data" / "reports" / "png-mismatch-contact-sheet.html"),
@@ -94,6 +99,8 @@ def build_parser() -> argparse.ArgumentParser:
     coverage = sub.add_parser("coverage", help="check report recommendation coverage")
     coverage.add_argument("--config", default=str(PROJECT_ROOT / "config" / "sources.yml"))
     coverage.add_argument("--json", action="store_true")
+
+    add_improve_parser(sub)
 
     return parser
 
@@ -128,17 +135,19 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "build-splits":
             return _build_splits(args)
         if args.command == "report":
-            records = read_jsonl(args.manifest)
+            records = _read_curated_records(args.manifest, args.curation)
             path = write_report(records, args.output)
             print(f"Wrote report: {path}")
             return 0
         if args.command == "png-contact-sheet":
-            records = read_jsonl(args.manifest)
+            records = _read_curated_records(args.manifest, args.curation)
             path, count = write_png_mismatch_contact_sheet(records, args.output, args.source_root or None)
             print(f"Wrote {count} PNG mismatch rows to {path}")
             return 0
         if args.command == "coverage":
             return _coverage(args)
+        if args.command == "improve":
+            return dispatch_improve(args)
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -314,11 +323,16 @@ def _audit_licenses(args: argparse.Namespace) -> int:
 
 
 def _build_splits(args: argparse.Namespace) -> int:
-    records = read_jsonl(args.manifest)
+    records = _read_curated_records(args.manifest, args.curation)
     splits = build_splits(records, args.output_dir, synthetic_cap=args.synthetic_cap)
     for name, split_records in sorted(splits.items()):
         print(f"{name}: {len(split_records)}")
     return 0
+
+
+def _read_curated_records(manifest_path: str, curation_path: str) -> list[CorpusRecord]:
+    records = read_jsonl(manifest_path)
+    return apply_curation(records, load_curation_decisions(curation_path))
 
 
 def _coverage(args: argparse.Namespace) -> int:

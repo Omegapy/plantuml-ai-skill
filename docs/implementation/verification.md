@@ -58,6 +58,18 @@ For visual review, generate a side-by-side HTML contact sheet for PNG mismatches
 plantuml-skill png-contact-sheet --manifest data/manifests/plantuml-examples-verified.jsonl --output data/reports/plantuml-examples-png-contact-sheet.html
 ```
 
+Reviewed visual mismatches are recorded under `config/curation/`. The accepted status vocabulary is:
+
+- `renderer_version_drift`: same source appears to render differently under the pinned PlantUML/Graphviz stack.
+- `published_image_drift`: published PNG likely came from an older or different source or include snapshot.
+- `minor_acceptable_drift`: visually equivalent enough for curator-approved `gold_eval` promotion.
+- `suspicious_pairing`: image and code may still be incorrectly paired.
+- `true_regression`: rendered output appears meaningfully wrong.
+
+Promotion stays conservative: a PNG/SVG mismatch without curation is blocked, and a reviewed mismatch is promoted only when the curation status is explicitly allowed for that split. Currently `minor_acceptable_drift` is allowed for `gold_eval`; other reviewed mismatch classes remain blocked.
+
+The remaining PlantUML-Examples mindmap failure has a recorded `renderer_version_drift` disposition. The raw source is intact, and `PlantUML 1.2026.3` rejects `style mindmapDiagram`; removing only that style block renders successfully. The pipeline records the incompatibility rather than silently transforming the example.
+
 Some PlantUML diagram families emit status chatter before piped SVG/PNG bytes. The renderer strips that prefix before hashing or decoding so valid diagrams are not mislabeled as renderer failures.
 
 ## Source-Conditioned Evaluation
@@ -68,16 +80,14 @@ External py2puml acquisition maps fully qualified classes and enums in expected 
 
 ## Recommended Local Verification
 
+This is a local-only development project. Verification is intended to run on the developer machine with the pinned PlantUML jar, a local Java runtime, and local Graphviz. GitHub Actions, GitHub CLI authentication, and remote runners are not required quality gates.
+
 ```bash
-plantuml-skill coverage
-plantuml-skill init-assets
-plantuml-skill doctor
-plantuml-skill acquire --source fixtures --output data/manifests/fixtures.jsonl
-plantuml-skill render --manifest data/manifests/fixtures.jsonl --output data/manifests/rendered.jsonl
-plantuml-skill verify --manifest data/manifests/rendered.jsonl --output data/manifests/verified.jsonl
-plantuml-skill audit-licenses --manifest data/manifests/verified.jsonl
-plantuml-skill build-splits --manifest data/manifests/verified.jsonl
-plantuml-skill report --manifest data/manifests/verified.jsonl
+PYTHONPATH=src python -m unittest discover -s tests
+PYTHONPATH=src python -m plantuml_ai_skill doctor
+PYTHONPATH=src python -m plantuml_ai_skill acquire --source fixtures --output data/manifests/fixtures.jsonl
+PYTHONPATH=src python -m plantuml_ai_skill render --manifest data/manifests/fixtures.jsonl --output data/manifests/rendered.jsonl --render-dir data/rendered
+PYTHONPATH=src python -m plantuml_ai_skill verify --manifest data/manifests/rendered.jsonl --output data/manifests/verified.jsonl
 ```
 
 If Java is not installed, `doctor`, `init-assets` verification, and real rendering will stop with an actionable runtime message.

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlantUML Skill Version",
+  "type": "object",
+  "required": [
+    "id",
+    "created_at",
+    "git_commit",
+    "skill_path",
+    "skill_sha256",
+    "builder_version",
+    "source_manifests"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "minLength": 1 },
+    "git_commit": { "type": "string" },
+    "skill_path": { "type": "string", "minLength": 1 },
+    "skill_sha256": { "type": "string", "minLength": 1 },
+    "builder_version": { "type": "string", "minLength": 1 },
+    "source_manifests": { "type": "array", "items": { "type": "string" } },
+    "notes": { "type": "string" }
+  }
+}

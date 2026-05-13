@@ -33,6 +33,10 @@ Temporary Items
 /data/manifests/
 /data/reports/
 /data/vendor/
+/data/improvement/suites/
+/data/improvement/runs/
+/data/improvement/approvals/
+/data/improvement/index.json
 /tools/plantuml/
 /.cache/
 

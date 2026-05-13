@@ -31,6 +31,9 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
 
+      - name: Check skill package
+        run: plantuml-skill improve lint-skill
+
       - name: Run fixture corpus smoke workflow
         run: |
           plantuml-skill coverage --json
@@ -40,3 +43,11 @@ jobs:
           plantuml-skill audit-licenses --manifest data/manifests/verified.jsonl
           plantuml-skill build-splits --manifest data/manifests/verified.jsonl
           plantuml-skill report --manifest data/manifests/verified.jsonl
+
+      - name: Run improvement smoke test
+        run: |
+          plantuml-skill improve init --no-overwrite
+          plantuml-skill improve make-suite --output data/improvement/suites/ci-smoke.jsonl --max-cases 5
+          plantuml-skill improve begin-run --suite data/improvement/suites/ci-smoke.jsonl --run-id ci-smoke
+          plantuml-skill improve evaluate --run ci-smoke --allow-missing-attempts
+          plantuml-skill improve next-prompt --run ci-smoke

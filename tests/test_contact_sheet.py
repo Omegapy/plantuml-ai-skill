@@ -69,6 +69,7 @@ class ContactSheetTests(unittest.TestCase):
                     "png_hash_distance": "10",
                     "published_png_dimensions": "1x1",
                     "rendered_png_dimensions": "1x1",
+                    "curation_status": "minor_acceptable_drift",
                 },
             )
             output, count = write_png_mismatch_contact_sheet(
@@ -80,6 +81,7 @@ class ContactSheetTests(unittest.TestCase):
             assets = output.parent / "contact_assets"
             self.assertEqual(1, count)
             self.assertIn("record-1", html)
+            self.assertIn("reviewed minor_acceptable_drift", html)
             self.assertTrue((assets / "record-1-reference.png").exists())
             self.assertTrue((assets / "record-1-rendered.png").exists())
 

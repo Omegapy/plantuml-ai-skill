@@ -63,6 +63,23 @@ class LicenseSplitTests(unittest.TestCase):
         record.extra["published_render_pairing_status"] = "ambiguous_markdown_reference"
         self.assertEqual("ambiguous_markdown_reference", promotion_block_reason(record, "gold_eval"))
 
+    def test_reviewed_minor_png_mismatch_can_enter_gold_eval_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "fixtures.jsonl"
+            records = acquire_fixtures(FIXTURES, manifest)
+        record = records[0]
+        record.render_status = "ok"
+        record.verification_status = "png_mismatch"
+        self.assertEqual("png_mismatch_unreviewed", promotion_block_reason(record, "gold_eval"))
+
+        record.extra["curation_status"] = "renderer_version_drift"
+        record.extra["curation_applies_to"] = "png_mismatch"
+        self.assertEqual("png_mismatch_renderer_version_drift", promotion_block_reason(record, "gold_eval"))
+
+        record.extra["curation_status"] = "minor_acceptable_drift"
+        self.assertEqual("", promotion_block_reason(record, "gold_eval"))
+        self.assertEqual("png_mismatch_minor_acceptable_drift", promotion_block_reason(record, "renderer_regression"))
+
 
 if __name__ == "__main__":
     unittest.main()

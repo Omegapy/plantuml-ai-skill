@@ -16,6 +16,9 @@ def summarize_records(records: list[CorpusRecord]) -> dict[str, Counter[str]]:
         "diagram_types": Counter(record.diagram_type for record in records),
         "render_status": Counter(record.render_status for record in records),
         "verification_status": Counter(record.verification_status for record in records),
+        "curation_status": Counter(
+            str(record.extra["curation_status"]) for record in records if record.extra.get("curation_status")
+        ),
         "purposes": Counter(purpose for record in records for purpose in record.purpose),
     }
 
@@ -84,7 +87,7 @@ def _diagnostics_section(records: list[CorpusRecord]) -> list[str]:
             "syntax incompatibility or renderer failure under the pinned renderer",
             "exclude pending manual syntax triage",
             [
-                (record, record.render_fail_reason)
+                (record, _diagnostic_detail(record, record.render_fail_reason))
                 for record in records
                 if record.render_status == "failed"
             ],
@@ -92,7 +95,7 @@ def _diagnostics_section(records: list[CorpusRecord]) -> list[str]:
         (
             "png_svg_mismatches",
             "published image differs from the pinned renderer output",
-            "exclude from trusted visual regression until reviewed or rebaselined",
+            "use explicit curation; only minor acceptable drift enters gold evaluation",
             [
                 (record, _visual_mismatch_detail(record))
                 for record in records
@@ -195,7 +198,30 @@ def _visual_mismatch_detail(record: CorpusRecord) -> str:
             f"{record.extra['published_png_dimensions']} published/"
             f"{record.extra['rendered_png_dimensions']} rendered"
         )
+    parts.extend(_curation_parts(record))
     return "; ".join(parts)
+
+
+def _diagnostic_detail(record: CorpusRecord, detail: str) -> str:
+    clean_detail = " ".join(detail.split()) if detail else ""
+    parts = [clean_detail] if clean_detail else []
+    parts.extend(_curation_parts(record))
+    return "; ".join(parts)
+
+
+def _curation_parts(record: CorpusRecord) -> list[str]:
+    if not record.extra.get("curation_status"):
+        return []
+    parts = [f"reviewed={record.extra['curation_status']}"]
+    if record.extra.get("curation_rationale"):
+        parts.append(f"rationale={record.extra['curation_rationale']}")
+    if record.extra.get("curation_reviewer") and record.extra.get("curation_reviewed_at"):
+        parts.append(f"by={record.extra['curation_reviewer']}@{record.extra['curation_reviewed_at']}")
+    elif record.extra.get("curation_reviewer"):
+        parts.append(f"by={record.extra['curation_reviewer']}")
+    elif record.extra.get("curation_reviewed_at"):
+        parts.append(f"reviewed_at={record.extra['curation_reviewed_at']}")
+    return parts
 
 
 def _markdown_table(headers: list[str], rows: list[list[str]]) -> list[str]:

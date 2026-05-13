@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlantUML Skill Improvement Run",
+  "type": "object",
+  "required": [
+    "id",
+    "created_at",
+    "status",
+    "suite_path",
+    "attempts_path",
+    "results_path"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "minLength": 1 },
+    "baseline_skill_version_id": { "type": "string" },
+    "candidate_skill_version_id": { "type": "string" },
+    "suite_path": { "type": "string", "minLength": 1 },
+    "attempts_path": { "type": "string", "minLength": 1 },
+    "results_path": { "type": "string", "minLength": 1 },
+    "report_path": { "type": "string" },
+    "next_handoff_path": { "type": "string" },
+    "metrics": { "type": "object" }
+  }
+}

@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import sys
 
-from .acquisition import acquire_source, ensure_generated_dirs
+from .acquisition import acquire_source, ensure_generated_dirs, vendor_include_source
 from .assets import init_assets
 from .config import load_sources_config
 from .constants import DEFAULT_JAR_PATH, PROJECT_ROOT
@@ -40,6 +40,11 @@ def build_parser() -> argparse.ArgumentParser:
     acquire.add_argument("--source", required=True)
     acquire.add_argument("--output", default=str(PROJECT_ROOT / "data" / "manifests" / "source.jsonl"))
     acquire.add_argument("--dry-run", action="store_true")
+
+    vendor = sub.add_parser("vendor-includes", help="vendor include files from a configured source")
+    vendor.add_argument("--source", default="c4-plantuml")
+    vendor.add_argument("--output", default=str(PROJECT_ROOT / "data" / "vendor" / "c4-plantuml"))
+    vendor.add_argument("--force", action="store_true")
 
     extract = sub.add_parser("extract", help="extract PlantUML blocks from a local tree")
     extract.add_argument("--input", required=True)
@@ -98,6 +103,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "acquire":
             records = acquire_source(args.source, args.output, dry_run=args.dry_run)
             print(f"Wrote {len(records)} records to {args.output}")
+            return 0
+        if args.command == "vendor-includes":
+            copied = vendor_include_source(args.source, args.output, force=args.force)
+            print(f"Vendored {len(copied)} include files to {args.output}")
             return 0
         if args.command == "extract":
             return _extract(args)

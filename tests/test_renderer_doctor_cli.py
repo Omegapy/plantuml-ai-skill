@@ -44,6 +44,47 @@ class RendererDoctorCliTests(unittest.TestCase):
             self.assertIn("-DPLANTUML_SECURITY_PROFILE=SANDBOX", result.command)
             self.assertTrue(renderer.testdot().ok)
 
+    def test_renderer_strips_svg_pipe_status_chatter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake_java = tmp_path / "java"
+            fake_jar = tmp_path / "plantuml.jar"
+            fake_jar.write_text("fake", encoding="utf-8")
+            fake_java.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/bin/sh
+                    echo 'RUNNING net.sourceforge.plantuml.project.lang.Sentence'
+                    echo '<svg xmlns="http://www.w3.org/2000/svg"><text>Gantt</text></svg>'
+                    """
+                ),
+                encoding="utf-8",
+            )
+            os.chmod(fake_java, 0o755)
+            renderer = PlantUMLRenderer(jar_path=fake_jar, java_bin=str(fake_java))
+            result = renderer.render_svg("@startgantt\n@endgantt")
+        self.assertTrue(result.output.startswith(b"<svg"))
+
+    def test_renderer_strips_png_pipe_status_chatter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake_java = tmp_path / "java"
+            fake_jar = tmp_path / "plantuml.jar"
+            fake_jar.write_text("fake", encoding="utf-8")
+            fake_java.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/bin/sh
+                    printf 'RUNNING status\\n\\211PNG\\r\\n\\032\\nrest'
+                    """
+                ),
+                encoding="utf-8",
+            )
+            os.chmod(fake_java, 0o755)
+            renderer = PlantUMLRenderer(jar_path=fake_jar, java_bin=str(fake_java))
+            result = renderer.render_png("@startgantt\n@endgantt")
+        self.assertTrue(result.output.startswith(b"\x89PNG\r\n\x1a\n"))
+
     def test_renderer_includes_vendored_include_path_property(self) -> None:
         renderer = PlantUMLRenderer(
             jar_path=Path("plantuml.jar"),

@@ -124,11 +124,16 @@ def rewrite_includes_to_local_paths(puml_text: str, resolutions: list[IncludeRes
     return "\n".join(rewritten_lines)
 
 
-def inline_resolved_includes(puml_text: str, resolutions: list[IncludeResolution]) -> str:
+def inline_resolved_includes(
+    puml_text: str,
+    resolutions: list[IncludeResolution],
+    _seen: set[Path] | None = None,
+) -> str:
     """Inline resolved include files so sandboxed rendering needs no filesystem access."""
 
+    seen = _seen or set()
     resolved_by_target = {
-        resolution.target: resolution.resolved_path
+        _normalize_include_target(resolution.target): resolution.resolved_path
         for resolution in resolutions
         if resolution.resolved_path is not None
     }
@@ -140,13 +145,23 @@ def inline_resolved_includes(puml_text: str, resolutions: list[IncludeResolution
         if not match:
             inlined_lines.append(line)
             continue
-        target = match.group("target").strip().strip('"').strip("'")
+        target = _normalize_include_target(match.group("target"))
         resolved = resolved_by_target.get(target)
         if resolved is None:
             inlined_lines.append(line)
             continue
         inlined_lines.append(f"' begin inlined include: {target}")
-        inlined_lines.extend(resolved.read_text(encoding="utf-8", errors="replace").splitlines())
+        if resolved in seen:
+            inlined_lines.append(f"' skipped recursive include: {target}")
+        else:
+            include_text = resolved.read_text(encoding="utf-8", errors="replace")
+            nested_resolutions = resolve_include_deps(
+                parse_include_deps(include_text),
+                [resolved.parent],
+                resolved.parent,
+            )
+            include_text = inline_resolved_includes(include_text, nested_resolutions, seen | {resolved})
+            inlined_lines.extend(include_text.splitlines())
         inlined_lines.append(f"' end inlined include: {target}")
     if puml_text.endswith("\n"):
         return "\n".join(inlined_lines) + "\n"
@@ -186,3 +201,7 @@ def _include_candidates(target: str, roots: list[Path]) -> list[Path]:
         for name in names:
             candidates.append(root / name)
     return candidates
+
+
+def _normalize_include_target(target: str) -> str:
+    return target.strip().strip('"').strip("'")

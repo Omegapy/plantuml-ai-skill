@@ -15,7 +15,6 @@ def _strip_unstable_svg_text(svg: str) -> str:
     svg = re.sub(r'id="[^"]+"', 'id=""', svg)
     svg = re.sub(r'clip-path="url\(#.*?\)"', 'clip-path="url(#)"', svg)
     svg = re.sub(r'url\(#.*?\)', 'url(#)', svg)
-    svg = re.sub(r'\s+xmlns:xlink="[^"]*"', "", svg)
     return svg.strip()
 
 

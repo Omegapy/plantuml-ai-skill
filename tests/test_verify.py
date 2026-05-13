@@ -36,6 +36,14 @@ class VerifyTests(unittest.TestCase):
         self.assertEqual(svg_hash(left), svg_hash(right))
         self.assertTrue(svg_matches(left, right))
 
+    def test_svg_normalization_preserves_xlink_namespace(self) -> None:
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink">'
+            '<image xlink:href="data:image/png;base64,AAAA"/></svg>'
+        )
+        self.assertTrue(svg_hash(svg))
+
     def test_png_average_hash_fallback_matches_similar_simple_pngs(self) -> None:
         self.assertTrue(png_perceptual_match(tiny_png(200), tiny_png(201)))
 

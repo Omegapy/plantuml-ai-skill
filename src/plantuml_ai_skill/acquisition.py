@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 import re
 import shutil
@@ -17,6 +18,18 @@ from .manifest import CorpusRecord, write_jsonl
 
 
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
+PY2PUML_ITEM_RE = re.compile(
+    r"^\s*(?:abstract\s+)?(?:class|enum|interface)\s+"
+    r"(?P<fqn>[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)+)",
+    re.MULTILINE,
+)
+
+
+@dataclass(frozen=True)
+class SourcePairing:
+    paths: list[Path]
+    confidence: str
+    reason: str
 
 
 def records_from_diagrams(
@@ -44,6 +57,9 @@ def records_from_diagrams(
                 if diagram.published_render_path.is_relative_to(root)
                 else str(diagram.published_render_path)
             )
+        extra = {"block_index": diagram.block_index}
+        if diagram.published_render_pairing_status:
+            extra["published_render_pairing_status"] = diagram.published_render_pairing_status
         records.append(
             CorpusRecord(
                 id=diagram.id,
@@ -73,7 +89,7 @@ def records_from_diagrams(
                 license_path=license_path,
                 source_commit=source_commit,
                 source_repo_url=source_repo_url or source_url,
-                extra={"block_index": diagram.block_index},
+                extra=extra,
             )
         )
     return records
@@ -195,6 +211,27 @@ def acquire_source(
     return records
 
 
+def vendor_include_source(
+    source_id: str = "c4-plantuml",
+    output_dir: Path | str = PROJECT_ROOT / "data" / "vendor" / "c4-plantuml",
+    force: bool = False,
+    raw_dir: Path | str = PROJECT_ROOT / "data" / "raw",
+) -> list[Path]:
+    """Vendor PlantUML include files from a configured source."""
+
+    config = load_sources_config()
+    source = next((item for item in config.sources if item.id == source_id), None)
+    if not source:
+        raise ValueError(f"unknown source: {source_id}")
+    if source.acquisition_mode not in {"git", "local"}:
+        raise ValueError(f"{source_id} cannot be vendored from acquisition mode {source.acquisition_mode}")
+    staged_root = _stage_source(source, Path(raw_dir))
+    vendor_root = Path(output_dir)
+    if force and vendor_root.exists():
+        shutil.rmtree(vendor_root)
+    return copy_vendor_include_files(staged_root, vendor_root)
+
+
 def _stage_source(source: SourceDefinition, raw_dir: Path) -> Path:
     destination = raw_dir / source.id
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -226,6 +263,24 @@ def _stage_source(source: SourceDefinition, raw_dir: Path) -> Path:
     if source.acquisition_mode == "local":
         return Path(source.url)
     raise RuntimeError(f"unsupported acquisition mode: {source.acquisition_mode}")
+
+
+def copy_vendor_include_files(staged_root: Path, vendor_root: Path) -> list[Path]:
+    """Copy PlantUML include files from a staged tree into a vendor root."""
+
+    copied: list[Path] = []
+    vendor_root.mkdir(parents=True, exist_ok=True)
+    for source_path in sorted(staged_root.rglob("*")):
+        if not source_path.is_file() or source_path.suffix.lower() not in {".puml", ".iuml"}:
+            continue
+        if ".git" in source_path.parts:
+            continue
+        relative = source_path.relative_to(staged_root)
+        target = vendor_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target)
+        copied.append(target)
+    return copied
 
 
 def _license_from_policy(source: SourceDefinition) -> str:
@@ -266,9 +321,11 @@ def _find_license_file(root: Path) -> Path | None:
 def _attach_py2puml_python_sources(records: list[CorpusRecord], staged_root: Path) -> None:
     for record in records:
         puml_path = staged_root / record.puml_path
-        python_sources = python_sources_for_expected_puml(puml_path, staged_root)
-        if python_sources:
-            record.python_source_paths = [str(path.relative_to(staged_root)) for path in python_sources]
+        pairing = python_source_pairing_for_expected_puml(puml_path, staged_root)
+        if pairing.paths:
+            record.python_source_paths = [str(path.relative_to(staged_root)) for path in pairing.paths]
+            record.extra["source_pairing_confidence"] = pairing.confidence
+            record.extra["source_pairing_reason"] = pairing.reason
             if "source_conditioned_eval" not in record.purpose:
                 record.purpose.append("source_conditioned_eval")
         elif "source_conditioned_eval" in record.purpose:
@@ -278,11 +335,20 @@ def _attach_py2puml_python_sources(records: list[CorpusRecord], staged_root: Pat
 def python_sources_for_expected_puml(puml_path: Path, staged_root: Path) -> list[Path]:
     """Heuristically pair py2puml expected .puml files with Python sources."""
 
+    return python_source_pairing_for_expected_puml(puml_path, staged_root).paths
+
+
+def python_source_pairing_for_expected_puml(puml_path: Path, staged_root: Path) -> SourcePairing:
+    """Pair a py2puml expected diagram with Python source files."""
+
     if not puml_path.exists() or puml_path.suffix.lower() not in {".puml", ".plantuml", ".iuml"}:
-        return []
+        return SourcePairing([], "none", "not_expected_puml")
+    fqn_sources = _python_sources_from_puml_fqns(puml_path, staged_root)
+    if fqn_sources:
+        return SourcePairing(fqn_sources, "high", "matched_fully_qualified_diagram_items")
     same_stem = puml_path.with_suffix(".py")
     if same_stem.exists():
-        return [same_stem]
+        return SourcePairing([same_stem], "high", "matched_same_stem_python_source")
     parent = puml_path.parent
     candidates = sorted(
         path
@@ -290,14 +356,53 @@ def python_sources_for_expected_puml(puml_path: Path, staged_root: Path) -> list
         if path.name != "__init__.py" and ".git" not in path.parts
     )
     if candidates:
-        return candidates
+        return SourcePairing(candidates, "heuristic", "used_nearby_package_python_sources")
     init_file = parent / "__init__.py"
     if init_file.exists():
-        return [init_file]
-    if puml_path.name == "py2puml.domain.puml":
-        domain_root = staged_root / "src" / "py2puml" / "domain"
-        return sorted(domain_root.glob("*.py")) if domain_root.exists() else []
-    return []
+        return SourcePairing([init_file], "heuristic", "used_package_init_python_source")
+    return SourcePairing([], "none", "no_python_source_match")
+
+
+def _python_sources_from_puml_fqns(puml_path: Path, staged_root: Path) -> list[Path]:
+    puml_text = puml_path.read_text(encoding="utf-8", errors="replace")
+    roots = _python_module_roots(puml_path, staged_root)
+    sources: dict[str, Path] = {}
+    for match in PY2PUML_ITEM_RE.finditer(puml_text):
+        module_parts = match.group("fqn").split(".")[:-1]
+        source_path = _module_parts_to_python_path(module_parts, roots)
+        if source_path:
+            sources[source_path.as_posix()] = source_path
+    return [sources[key] for key in sorted(sources)]
+
+
+def _python_module_roots(puml_path: Path, staged_root: Path) -> list[Path]:
+    candidates = [
+        staged_root,
+        staged_root / "src",
+        puml_path.parent,
+        puml_path.parent / "src",
+        puml_path.parent.parent,
+        puml_path.parent.parent / "src",
+    ]
+    roots: list[Path] = []
+    for candidate in candidates:
+        if candidate.exists() and candidate not in roots:
+            roots.append(candidate)
+    return roots
+
+
+def _module_parts_to_python_path(module_parts: list[str], roots: list[Path]) -> Path | None:
+    if not module_parts:
+        return None
+    relative = Path(*module_parts)
+    for root in roots:
+        module_file = root / relative.with_suffix(".py")
+        if module_file.exists():
+            return module_file
+        init_file = root / relative / "__init__.py"
+        if init_file.exists():
+            return init_file
+    return None
 
 
 def ensure_generated_dirs() -> None:
@@ -306,6 +411,7 @@ def ensure_generated_dirs() -> None:
         PROJECT_ROOT / "data" / "rendered",
         PROJECT_ROOT / "data" / "manifests",
         PROJECT_ROOT / "data" / "reports",
+        PROJECT_ROOT / "data" / "vendor",
     ):
         path.mkdir(parents=True, exist_ok=True)
 

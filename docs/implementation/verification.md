@@ -32,7 +32,15 @@ On macOS, Homebrew installs OpenJDK as keg-only. The CLI automatically checks `/
 
 The extractor records `!include` dependencies and marks diagrams as non-self-contained when includes are present. External rendering uses local vendored include roots only. Remote includes are treated as blocked during batch verification.
 
-Resolved local includes are inlined before the diagram is piped to PlantUML. This keeps rendering compatible with the conservative sandbox profile without letting the renderer read arbitrary files at runtime.
+Resolved local includes are inlined before the diagram is piped to PlantUML. Inlining is recursive for local nested includes, while unresolved remote includes remain blocked. This keeps rendering compatible with the conservative sandbox profile without letting the renderer read arbitrary files at runtime.
+
+C4-PlantUML includes can be vendored from the pinned source registry entry:
+
+```bash
+plantuml-skill vendor-includes --source c4-plantuml --output data/vendor/c4-plantuml --force
+```
+
+Records that still use remote C4 URLs are reported as `remote_include_blocked` until a curator rewrites or maps those includes to the vendored snapshot.
 
 ## SVG Comparison
 
@@ -44,9 +52,13 @@ This avoids false mismatches from volatile SVG identifiers without pretending th
 
 PNG comparison is a fallback for sources that publish only raster references. The stdlib implementation decodes 8-bit grayscale, RGB, RGBA, and indexed-color PNGs, computes an average hash, and compares Hamming distance. It is intentionally secondary to SVG comparison.
 
+Some PlantUML diagram families emit status chatter before piped SVG/PNG bytes. The renderer strips that prefix before hashing or decoding so valid diagrams are not mislabeled as renderer failures.
+
 ## Source-Conditioned Evaluation
 
 The fixtures include py2puml-style Python source to PlantUML expected-output pairs. These records populate `source_conditioned_eval`, keeping Python-source-conditioned verification separate from general PlantUML text training.
+
+External py2puml acquisition maps fully qualified classes and enums in expected `.puml` files back to Python modules first. Records carry `source_pairing_confidence` metadata so reports can distinguish high-confidence source-conditioned rows from heuristic fallbacks.
 
 ## Recommended Local Verification
 

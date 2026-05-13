@@ -54,10 +54,28 @@ class PlantUMLRenderer:
         self.timeout = timeout
 
     def render_svg(self, puml_text: str) -> RenderResult:
-        return self._render(puml_text, "-tsvg")
+        result = self._render(puml_text, "-tsvg")
+        if result.ok:
+            return RenderResult(
+                result.ok,
+                _clean_svg_pipe_output(result.output),
+                result.stderr,
+                result.command,
+                result.returncode,
+            )
+        return result
 
     def render_png(self, puml_text: str) -> RenderResult:
-        return self._render(puml_text, "-tpng")
+        result = self._render(puml_text, "-tpng")
+        if result.ok:
+            return RenderResult(
+                result.ok,
+                _clean_png_pipe_output(result.output),
+                result.stderr,
+                result.command,
+                result.returncode,
+            )
+        return result
 
     def testdot(self) -> RenderResult:
         command = [self.java_bin, "-jar", str(self.jar_path), "-testdot"]
@@ -122,7 +140,16 @@ class NativePlantUMLRenderer:
         self.timeout = timeout
 
     def render_svg(self, puml_text: str) -> RenderResult:
-        return self._render(puml_text, "-tsvg")
+        result = self._render(puml_text, "-tsvg")
+        if result.ok:
+            return RenderResult(
+                result.ok,
+                _clean_svg_pipe_output(result.output),
+                result.stderr,
+                result.command,
+                result.returncode,
+            )
+        return result
 
     def _render(self, puml_text: str, output_format: str) -> RenderResult:
         command = [self.plantuml_bin, output_format, "-pipe", "-charset", "UTF-8"]
@@ -156,3 +183,21 @@ def sha256_file(path: Path | str) -> str:
 
 def render_version_label() -> str:
     return f"plantuml-java-jar-{PLANTUML_VERSION}"
+
+
+def _clean_svg_pipe_output(output: bytes) -> bytes:
+    """Drop non-SVG status chatter occasionally emitted before piped SVG."""
+
+    marker = output.find(b"<svg")
+    if marker <= 0:
+        return output
+    return output[marker:]
+
+
+def _clean_png_pipe_output(output: bytes) -> bytes:
+    """Drop non-PNG status chatter occasionally emitted before piped PNG."""
+
+    marker = output.find(b"\x89PNG\r\n\x1a\n")
+    if marker <= 0:
+        return output
+    return output[marker:]

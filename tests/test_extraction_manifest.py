@@ -3,7 +3,12 @@ import tempfile
 import unittest
 
 from plantuml_ai_skill.acquisition import acquire_fixtures
-from plantuml_ai_skill.extraction import classify_diagram_type, extract_from_tree, extract_plantuml_blocks
+from plantuml_ai_skill.extraction import (
+    classify_diagram_type,
+    extract_from_file,
+    extract_from_tree,
+    extract_plantuml_blocks,
+)
 from plantuml_ai_skill.includes import (
     parse_include_deps,
     inline_resolved_includes,
@@ -77,9 +82,107 @@ class ExtractionManifestTests(unittest.TestCase):
         self.assertIn("!procedure Container", inlined)
         self.assertNotIn("!include c4_fixture_container_include.puml", inlined)
 
+    def test_include_inlining_embeds_nested_local_includes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "nested.puml").write_text("' nested content\n", encoding="utf-8")
+            (root / "outer.puml").write_text(
+                "!include ./nested.puml\n!include https://example.test/remote.puml\n",
+                encoding="utf-8",
+            )
+            resolutions = resolve_include_deps(["outer.puml"], [root])
+            inlined = inline_resolved_includes("@startuml\n!include outer.puml\n@enduml\n", resolutions)
+        self.assertIn("begin inlined include: ./nested.puml", inlined)
+        self.assertIn("' nested content", inlined)
+        self.assertIn("!include https://example.test/remote.puml", inlined)
+
     def test_markdown_fenced_block_fallback(self) -> None:
         text = "```plantuml\n@startuml\nAlice -> Bob: hi\n@enduml\n```"
         self.assertEqual(1, len(extract_plantuml_blocks(text)))
+
+    def test_markdown_pairing_uses_adjacent_images(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "first.png").write_bytes(b"png")
+            (root / "second.png").write_bytes(b"png")
+            markdown = root / "examples.md"
+            markdown.write_text(
+                "\n".join(
+                    [
+                        "```plantuml",
+                        "@startuml",
+                        "Alice -> Bob: first",
+                        "@enduml",
+                        "```",
+                        "![first](first.png)",
+                        "```plantuml",
+                        "@startuml",
+                        "Alice -> Bob: second",
+                        "@enduml",
+                        "```",
+                        "![second](second.png)",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            diagrams = extract_from_file(markdown, "test")
+        self.assertEqual(["first.png", "second.png"], [item.published_render_path.name for item in diagrams])
+        self.assertEqual(
+            ["markdown_adjacent_after", "markdown_adjacent_after"],
+            [item.published_render_pairing_status for item in diagrams],
+        )
+
+    def test_markdown_pairing_does_not_duplicate_one_image_across_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "only.png").write_bytes(b"png")
+            markdown = root / "examples.md"
+            markdown.write_text(
+                "\n".join(
+                    [
+                        "```plantuml",
+                        "@startuml",
+                        "Alice -> Bob: first",
+                        "@enduml",
+                        "```",
+                        "```plantuml",
+                        "@startuml",
+                        "Alice -> Bob: second",
+                        "@enduml",
+                        "```",
+                        "![only](only.png)",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            diagrams = extract_from_file(markdown, "test")
+        self.assertEqual("", diagrams[0].published_render_pairing_status)
+        self.assertIsNone(diagrams[0].published_render_path)
+        self.assertEqual("only.png", diagrams[1].published_render_path.name)
+
+    def test_markdown_pairing_leaves_multiblock_without_images_unreferenced(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            markdown = root / "examples.md"
+            markdown.write_text(
+                "\n".join(
+                    [
+                        "```plantuml",
+                        "@startuml",
+                        "Alice -> Bob: first",
+                        "@enduml",
+                        "```",
+                        "```plantuml",
+                        "@startuml",
+                        "Alice -> Bob: second",
+                        "@enduml",
+                        "```",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            diagrams = extract_from_file(markdown, "test")
+        self.assertEqual([None, None], [item.published_render_path for item in diagrams])
 
     def test_acquire_fixtures_writes_valid_jsonl_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

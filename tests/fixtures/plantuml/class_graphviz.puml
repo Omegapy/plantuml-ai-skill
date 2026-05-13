@@ -1,0 +1,11 @@
+@startuml
+class Address {
+  street: str
+  city: str
+}
+class User {
+  name: str
+  address: Address
+}
+User *-- Address
+@enduml

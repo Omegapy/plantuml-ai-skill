@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plantuml-ai-skill"
+version = "0.1.0"
+description = "Acquisition, provenance, rendering, and verification tooling for PlantUML AI skill training data."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "PlantUML AI Skill Maintainers" }]
+dependencies = []
+
+[project.scripts]
+plantuml-skill = "plantuml_ai_skill.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

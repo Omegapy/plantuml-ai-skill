@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/plantuml-ai-skill/corpus-record.schema.json",
+  "title": "PlantUML Corpus Record",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "id",
+    "source_name",
+    "source_url",
+    "source_kind",
+    "source_ref",
+    "license",
+    "license_family",
+    "diagram_type",
+    "puml_path",
+    "published_render_path",
+    "python_source_paths",
+    "include_deps",
+    "is_self_contained",
+    "uses_include",
+    "uses_icon_library",
+    "plantuml_version",
+    "graphviz_version",
+    "render_status",
+    "render_hash_svg",
+    "render_hash_png",
+    "verification_status",
+    "render_fail_reason",
+    "purpose"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "source_name": { "type": "string", "minLength": 1 },
+    "source_url": { "type": "string" },
+    "source_kind": { "type": "string", "minLength": 1 },
+    "source_ref": { "type": "string" },
+    "license": { "type": "string" },
+    "license_family": {
+      "type": "string",
+      "enum": ["permissive", "weak_copyleft", "copyleft", "mixed", "unknown"]
+    },
+    "diagram_type": { "type": "string", "minLength": 1 },
+    "puml_path": { "type": "string", "minLength": 1 },
+    "published_render_path": { "type": "string" },
+    "python_source_paths": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "include_deps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "is_self_contained": { "type": "boolean" },
+    "uses_include": { "type": "boolean" },
+    "uses_icon_library": { "type": "boolean" },
+    "plantuml_version": { "type": "string" },
+    "graphviz_version": { "type": "string" },
+    "render_status": {
+      "type": "string",
+      "enum": ["not_rendered", "ok", "failed", "skipped"]
+    },
+    "render_hash_svg": { "type": "string" },
+    "render_hash_png": { "type": "string" },
+    "verification_status": {
+      "type": "string",
+      "enum": [
+        "not_verified",
+        "render_skipped",
+        "rendered_no_reference",
+        "svg_match",
+        "svg_mismatch",
+        "png_match",
+        "png_mismatch",
+        "verify_error",
+        "unsupported_reference_format"
+      ]
+    },
+    "render_fail_reason": { "type": "string" },
+    "purpose": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

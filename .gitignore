@@ -28,6 +28,12 @@ Temporary Items
 # Repo-local ignores
 /.codex/local/
 /.venv/
+/data/raw/
+/data/rendered/
+/data/manifests/
+/data/reports/
+/tools/plantuml/
+/.cache/
 
 
 # LaTeX build artifacts
@@ -37,3 +43,7 @@ Temporary Items
 
 # Python build artifacts
 __pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/

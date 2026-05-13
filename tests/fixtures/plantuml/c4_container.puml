@@ -1,0 +1,8 @@
+@startuml
+!include C4_Container.puml
+Person(user, "User")
+System_Boundary(app, "App") {
+  Container(api, "API", "Python/FastAPI")
+}
+Rel(user, api, "Uses")
+@enduml

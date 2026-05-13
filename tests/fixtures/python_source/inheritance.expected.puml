@@ -1,0 +1,13 @@
+@startuml
+class Animal {
+  name: str
+}
+class Dog {
+  breed: str
+}
+class Owner {
+  dogs: list[Dog]
+}
+Dog --|> Animal
+Owner o-- Dog
+@enduml

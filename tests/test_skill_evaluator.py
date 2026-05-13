@@ -81,6 +81,67 @@ class SkillEvaluatorTests(unittest.TestCase):
         self.assertEqual("failed", result.render_status)
         self.assertIn("render_timeout", {failure.code for failure in result.failures})
 
+    def test_required_edges_match_declared_aliases(self) -> None:
+        case = SkillEvalCase(
+            id="component-web-api-database",
+            suite="core",
+            prompt="Create a component diagram showing Web App calling API and API sending email through Notification Service.",
+            expected_diagram_type="component",
+            required_patterns=["Web App", "API", "Notification Service"],
+            forbidden_patterns=["!includeurl", "TODO", "placeholder"],
+            required_edges=[("Web App", "API"), ("API", "Notification Service")],
+            include_policy="self_contained_only",
+            purpose=["skill_eval"],
+            difficulty="easy",
+            tags=["component"],
+        )
+        attempt = _attempt(
+            "\n".join(
+                [
+                    "@startuml",
+                    'component "Web App" as WebApp',
+                    "component API",
+                    'component "Notification Service" as NotificationService',
+                    "WebApp --> API : calls",
+                    "API --> NotificationService : sends email",
+                    "@enduml",
+                ]
+            )
+        )
+        result = evaluate_attempt(case, attempt, FakeRenderer())
+        self.assertEqual([], result.failures)
+
+    def test_required_edges_match_usecase_aliases(self) -> None:
+        case = SkillEvalCase(
+            id="usecase-customer-support",
+            suite="core",
+            prompt="Create a use case diagram with Customer and Support Agent.",
+            expected_diagram_type="usecase",
+            required_patterns=["Customer", "Support Agent", "Submit Ticket", "Resolve Ticket"],
+            forbidden_patterns=["!includeurl", "TODO", "placeholder"],
+            required_edges=[("Customer", "Submit Ticket"), ("Support Agent", "Resolve Ticket")],
+            include_policy="self_contained_only",
+            purpose=["skill_eval"],
+            difficulty="easy",
+            tags=["usecase"],
+        )
+        attempt = _attempt(
+            "\n".join(
+                [
+                    "@startuml",
+                    "actor Customer",
+                    'actor "Support Agent" as SupportAgent',
+                    'usecase "Submit Ticket" as SubmitTicket',
+                    'usecase "Resolve Ticket" as ResolveTicket',
+                    "Customer --> SubmitTicket",
+                    "SupportAgent --> ResolveTicket",
+                    "@enduml",
+                ]
+            )
+        )
+        result = evaluate_attempt(case, attempt, FakeRenderer())
+        self.assertEqual([], result.failures)
+
 
 def _case() -> SkillEvalCase:
     return SkillEvalCase(

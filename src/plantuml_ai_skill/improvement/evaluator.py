@@ -23,6 +23,13 @@ from .scoring import metrics_from_results, score_statuses
 
 START_END_RE = re.compile(r"(?is)^\s*@start(?P<kind>[A-Za-z0-9_ -]*)\b.*@end(?P=kind)\b\s*$")
 RELATION_RE = re.compile(r"[-.]+[->ox*]+|<[-.]+|[*o]--|--[*o]?|\\.\\.|-->|->")
+DECLARATION_ALIAS_RE = re.compile(
+    r'(?im)^\s*(?:actor|participant|boundary|control|entity|database|collections|queue|component|node|cloud|class|interface|enum|usecase)\s+"(?P<label>[^"]+)"\s+as\s+(?P<alias>[A-Za-z_][\w.]*)'
+)
+BRACKET_ALIAS_RE = re.compile(r"(?im)^\s*\[(?P<label>[^\]]+)\]\s+as\s+(?P<alias>[A-Za-z_][\w.]*)")
+C4_ALIAS_RE = re.compile(
+    r'(?i)\b(?:Person|System|Container|Component|Database|Queue|Boundary|System_Boundary|Container_Boundary|Component_Boundary)\(\s*(?P<alias>[A-Za-z_][\w.]*)\s*,\s*"(?P<label>[^"]+)"'
+)
 
 
 def evaluate_attempt(
@@ -321,21 +328,43 @@ def _render_failure_code(stderr: str) -> str:
 
 
 def _has_edge(puml: str, left: str, right: str) -> bool:
-    left_lower = left.lower()
-    right_lower = right.lower()
+    aliases = _aliases_by_label(puml)
+    left_terms = _candidate_terms(left, aliases)
+    right_terms = _candidate_terms(right, aliases)
     for line in puml.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("'"):
             continue
         lowered = stripped.lower()
-        if left_lower not in lowered or right_lower not in lowered:
-            continue
-        left_index = lowered.find(left_lower)
-        right_index = lowered.find(right_lower)
-        if left_index < right_index:
-            middle = stripped[left_index + len(left) : right_index]
-        else:
-            middle = stripped[right_index + len(right) : left_index]
-        if RELATION_RE.search(middle):
-            return True
+        for left_term in left_terms:
+            left_index = lowered.find(left_term)
+            if left_index < 0:
+                continue
+            for right_term in right_terms:
+                right_index = lowered.find(right_term)
+                if right_index < 0:
+                    continue
+                if left_index < right_index:
+                    middle = stripped[left_index + len(left_term) : right_index]
+                else:
+                    middle = stripped[right_index + len(right_term) : left_index]
+                if RELATION_RE.search(middle):
+                    return True
     return False
+
+
+def _candidate_terms(label: str, aliases: dict[str, set[str]]) -> set[str]:
+    normalized = label.lower()
+    terms = {normalized}
+    terms.update(aliases.get(normalized, set()))
+    return {term for term in terms if term}
+
+
+def _aliases_by_label(puml: str) -> dict[str, set[str]]:
+    aliases: dict[str, set[str]] = {}
+    for pattern in (DECLARATION_ALIAS_RE, BRACKET_ALIAS_RE, C4_ALIAS_RE):
+        for match in pattern.finditer(puml):
+            label = match.group("label").strip().lower()
+            alias = match.group("alias").strip().lower()
+            aliases.setdefault(label, set()).add(alias)
+    return aliases

@@ -57,6 +57,7 @@ class ExtractionManifestTests(unittest.TestCase):
         sequence = "\n".join(
             [
                 "@startuml",
+                "actor Client",
                 "participant API",
                 "database Database",
                 "API -> Database : query",
@@ -65,6 +66,32 @@ class ExtractionManifestTests(unittest.TestCase):
             ]
         )
         self.assertEqual("sequence", classify_diagram_type(sequence))
+
+    def test_classifies_component_with_dependency_arrows(self) -> None:
+        component = "\n".join(
+            [
+                "@startuml",
+                "component \"Web App\" as WebApp",
+                "component \"API\" as API",
+                "database \"Database\" as Database",
+                "WebApp --> API : calls",
+                "API --> Database : uses",
+                "@enduml",
+            ]
+        )
+        self.assertEqual("component", classify_diagram_type(component))
+
+    def test_classifies_usecase_before_generic_arrows(self) -> None:
+        usecase = "\n".join(
+            [
+                "@startuml",
+                "actor Customer",
+                "usecase \"Submit Ticket\" as SubmitTicket",
+                "Customer --> SubmitTicket",
+                "@enduml",
+            ]
+        )
+        self.assertEqual("usecase", classify_diagram_type(usecase))
 
     def test_include_parsing_marks_c4_dependency(self) -> None:
         c4 = (FIXTURES / "plantuml" / "c4_container.puml").read_text()

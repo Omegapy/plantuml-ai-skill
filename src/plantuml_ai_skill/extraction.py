@@ -93,16 +93,20 @@ def classify_diagram_type(puml_text: str) -> str:
         return start_kind.replace(" ", "_")
     if re.search(r"^\s*(class|interface|enum|abstract\s+class)\s+\w+", puml_text, re.MULTILINE):
         return "class"
-    if re.search(r"^\s*(actor|usecase)\s+", puml_text, re.MULTILINE):
-        return "usecase"
     if re.search(r"^\s*state\s+\w+", puml_text, re.MULTILINE):
         return "state"
     if re.search(r"^\s*(?:\[\*\]\s*[-.]+>|\w+\s*[-.]+>\s*\[\*\])", puml_text, re.MULTILINE):
         return "state"
+    if re.search(r"^\s*(component|node|cloud)\s+", puml_text, re.MULTILINE):
+        return "component"
+    if re.search(r"^\s*\[[^\]]+\](?:\s+as\s+\w+)?", puml_text, re.IGNORECASE | re.MULTILINE):
+        return "component"
+    if re.search(r"^\s*usecase\s+", puml_text, re.IGNORECASE | re.MULTILINE):
+        return "usecase"
     if re.search(r"[-.]+[ox*]?>|<[-.]+", puml_text):
         return "sequence"
-    if re.search(r"^\s*(component|node|database|cloud)\s+", puml_text, re.MULTILINE):
-        return "component"
+    if re.search(r"^\s*(actor|database)\s+", puml_text, re.MULTILINE):
+        return "usecase" if re.search(r"^\s*actor\s+", puml_text, re.MULTILINE) else "component"
     if re.search(r"^\s*:\s*[^;]+;", puml_text, re.MULTILINE):
         return "activity"
     return "uml"

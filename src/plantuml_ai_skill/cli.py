@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from dataclasses import dataclass
 import json
 from pathlib import Path
 import sys
+import tempfile
 
 from .acquisition import (
     SYNTHETIC_UML_DATASET_ID,
@@ -26,7 +28,7 @@ from .includes import inline_resolved_includes, resolve_include_deps, unresolved
 from .license_policy import blocked_license_review_for_repo, load_license_blocklist, training_block_reason
 from .manifest import CorpusRecord, read_jsonl, write_jsonl
 from .recommendation_coverage import check_recommendation_coverage
-from .renderer import PlantUMLRenderer, render_version_label
+from .renderer import PlantUMLRenderer, RenderResult, render_version_label
 from .reporting import (
     render_failure_report,
     render_failure_summary_report,
@@ -37,7 +39,14 @@ from .reporting import (
     write_report,
 )
 from .splits import build_splits
-from .verify import png_average_hash, png_dimensions, png_hash_distance, png_perceptual_match, svg_hash, svg_matches
+from .verify import (
+    PNG_PERCEPTUAL_MAX_DISTANCE,
+    png_average_hash,
+    png_dimensions,
+    png_hash_distance,
+    svg_hash,
+    svg_matches,
+)
 from .improvement.cli import add_improve_parser, dispatch as dispatch_improve
 
 
@@ -94,6 +103,12 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--render-dir", default=str(PROJECT_ROOT / "data" / "rendered"))
     render.add_argument("--jar", default=str(DEFAULT_JAR_PATH))
     render.add_argument("--java", default="")
+    render.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="render records in PlantUML file batches; 1 keeps the per-record pipe renderer",
+    )
     render.add_argument(
         "--include-root",
         action="append",
@@ -296,32 +311,35 @@ def _render(args: argparse.Namespace) -> int:
     renderer = PlantUMLRenderer(jar_path=args.jar, java_bin=args.java or None, include_roots=include_roots)
     render_dir = Path(args.render_dir)
     render_dir.mkdir(parents=True, exist_ok=True)
+    batch_size = max(1, int(args.batch_size or 1))
+    if batch_size > 1:
+        return _render_batched(
+            records,
+            renderer,
+            render_dir,
+            args.output,
+            args.source_root,
+            include_roots,
+            batch_size,
+        )
+    return _render_serial(records, renderer, render_dir, args.output, args.source_root, include_roots)
+
+
+def _render_serial(
+    records: list[CorpusRecord],
+    renderer: PlantUMLRenderer,
+    render_dir: Path,
+    output: str,
+    source_root: str,
+    include_roots: list[Path],
+) -> int:
     updated: list[CorpusRecord] = []
     for record in records:
         try:
-            puml_path = _resolve_record_path(record, args.source_root)
-            include_resolutions = (
-                resolve_include_deps(record.include_deps, include_roots, puml_path.parent)
-                if record.include_deps
-                else []
-            )
-            include_reason = unresolved_resolution_reason(include_resolutions)
-            if include_reason:
-                record.render_status = "skipped"
-                record.render_fail_reason = include_reason
+            puml_text = _prepare_render_text(record, source_root, include_roots)
+            if record.render_status == "skipped":
                 updated.append(record)
                 continue
-            mirrored = [
-                resolution.target
-                for resolution in include_resolutions
-                if resolution.reason == "trusted_remote_mirrored"
-            ]
-            if mirrored:
-                record.extra["include_resolution_status"] = "trusted_remote_mirrored"
-                record.extra["mirrored_include_deps"] = mirrored
-            puml_text = _puml_text_for_record(record, puml_path)
-            if record.include_deps:
-                puml_text = inline_resolved_includes(puml_text, include_resolutions)
             result = renderer.render_svg(puml_text)
             if result.ok:
                 svg_path = render_dir / f"{record.id}.svg"
@@ -348,12 +366,156 @@ def _render(args: argparse.Namespace) -> int:
             record.render_status = "failed"
             record.render_fail_reason = str(exc)
         updated.append(record)
-    write_jsonl(updated, args.output)
+    write_jsonl(updated, output)
     failed = sum(record.render_status == "failed" for record in updated)
     rendered = sum(record.render_status == "ok" for record in updated)
     skipped = sum(record.render_status == "skipped" for record in updated)
-    print(f"Rendered {rendered}/{len(updated)} records; skipped {skipped}; wrote {args.output}")
+    print(f"Rendered {rendered}/{len(updated)} records; skipped {skipped}; wrote {output}")
     return 0 if failed == 0 else 1
+
+
+@dataclass(frozen=True)
+class _BatchRenderItem:
+    index: int
+    record: CorpusRecord
+    puml_text: str
+
+
+def _render_batched(
+    records: list[CorpusRecord],
+    renderer: PlantUMLRenderer,
+    render_dir: Path,
+    output: str,
+    source_root: str,
+    include_roots: list[Path],
+    batch_size: int,
+) -> int:
+    updated: list[CorpusRecord | None] = [None] * len(records)
+    batch: list[_BatchRenderItem] = []
+    for index, record in enumerate(records):
+        try:
+            puml_text = _prepare_render_text(record, source_root, include_roots)
+            if record.render_status == "skipped":
+                updated[index] = record
+                continue
+            batch.append(_BatchRenderItem(index=index, record=record, puml_text=puml_text))
+            if len(batch) >= batch_size:
+                _render_batch(batch, renderer, render_dir)
+                for item in batch:
+                    updated[item.index] = item.record
+                batch = []
+        except Exception as exc:
+            record.render_status = "failed"
+            record.render_fail_reason = str(exc)
+            updated[index] = record
+    if batch:
+        _render_batch(batch, renderer, render_dir)
+        for item in batch:
+            updated[item.index] = item.record
+    output_records = [record for record in updated if record is not None]
+    write_jsonl(output_records, output)
+    failed = sum(record.render_status == "failed" for record in output_records)
+    rendered = sum(record.render_status == "ok" for record in output_records)
+    skipped = sum(record.render_status == "skipped" for record in output_records)
+    print(f"Rendered {rendered}/{len(output_records)} records; skipped {skipped}; wrote {output}")
+    return 0 if failed == 0 else 1
+
+
+def _render_batch(items: list[_BatchRenderItem], renderer: PlantUMLRenderer, render_dir: Path) -> None:
+    with tempfile.TemporaryDirectory(prefix="plantuml-batch-") as tmp:
+        tmp_root = Path(tmp)
+        puml_dir = tmp_root / "puml"
+        svg_dir = tmp_root / "svg"
+        png_dir = tmp_root / "png"
+        puml_dir.mkdir()
+        svg_dir.mkdir()
+        png_dir.mkdir()
+        input_paths: list[Path] = []
+        for item in items:
+            puml_path = puml_dir / f"{item.record.id}.puml"
+            puml_path.write_text(item.puml_text, encoding="utf-8")
+            input_paths.append(puml_path)
+
+        svg_result = renderer.render_batch(input_paths, "-tsvg", svg_dir)
+        png_items: list[_BatchRenderItem] = []
+        for item, input_path in zip(items, input_paths):
+            svg_path = svg_dir / f"{item.record.id}.svg"
+            if not svg_path.exists():
+                _mark_batch_render_failed(item.record, svg_result, input_path, "svg output missing")
+                continue
+            svg_bytes = svg_path.read_bytes()
+            if _plantuml_error_svg(svg_bytes):
+                _mark_batch_render_failed(item.record, svg_result, input_path, "svg contains PlantUML error output")
+                continue
+            final_svg_path = render_dir / f"{item.record.id}.svg"
+            final_svg_path.write_bytes(svg_bytes)
+            item.record.render_status = "ok"
+            item.record.render_hash_svg = svg_hash(svg_bytes)
+            item.record.plantuml_version = render_version_label()
+            item.record.render_fail_reason = ""
+            item.record.extra["rendered_svg_path"] = str(final_svg_path)
+            if item.record.published_render_path.lower().endswith(".png"):
+                png_items.append(item)
+
+        if not png_items:
+            return
+        png_input_paths = [puml_dir / f"{item.record.id}.puml" for item in png_items]
+        png_result = renderer.render_batch(png_input_paths, "-tpng", png_dir)
+        for item, input_path in zip(png_items, png_input_paths):
+            png_path = png_dir / f"{item.record.id}.png"
+            if not png_path.exists():
+                _mark_batch_render_failed(item.record, png_result, input_path, "png output missing")
+                continue
+            png_bytes = png_path.read_bytes()
+            final_png_path = render_dir / f"{item.record.id}.png"
+            final_png_path.write_bytes(png_bytes)
+            item.record.render_hash_png = str(png_average_hash(png_bytes))
+            item.record.extra["rendered_png_path"] = str(final_png_path)
+
+
+def _prepare_render_text(record: CorpusRecord, source_root: str, include_roots: list[Path]) -> str:
+    puml_path = _resolve_record_path(record, source_root)
+    include_resolutions = (
+        resolve_include_deps(record.include_deps, include_roots, puml_path.parent)
+        if record.include_deps
+        else []
+    )
+    include_reason = unresolved_resolution_reason(include_resolutions)
+    if include_reason:
+        record.render_status = "skipped"
+        record.render_fail_reason = include_reason
+        return ""
+    mirrored = [
+        resolution.target
+        for resolution in include_resolutions
+        if resolution.reason == "trusted_remote_mirrored"
+    ]
+    if mirrored:
+        record.extra["include_resolution_status"] = "trusted_remote_mirrored"
+        record.extra["mirrored_include_deps"] = mirrored
+    puml_text = _puml_text_for_record(record, puml_path)
+    if record.include_deps:
+        puml_text = inline_resolved_includes(puml_text, include_resolutions)
+    return puml_text
+
+
+def _mark_batch_render_failed(
+    record: CorpusRecord,
+    result: RenderResult,
+    input_path: Path,
+    detail: str,
+) -> None:
+    record.render_status = "failed"
+    stderr = result.stderr.strip()
+    if stderr:
+        record.render_fail_reason = f"{detail}: {stderr}"
+    else:
+        record.render_fail_reason = f"{detail}: returncode_{result.returncode}; file={input_path.name}"
+
+
+def _plantuml_error_svg(svg_bytes: bytes) -> bool:
+    text = svg_bytes.decode("utf-8", errors="replace")
+    return "Syntax Error" in text or "Some diagram description contains errors" in text
 
 
 def _verify(args: argparse.Namespace) -> int:
@@ -386,7 +548,7 @@ def _verify(args: argparse.Namespace) -> int:
                     record.extra["published_png_dimensions"] = _dimensions_label(png_dimensions(reference_bytes))
                     record.verification_status = (
                         "png_match"
-                        if png_perceptual_match(rendered_bytes, reference_bytes)
+                        if distance <= PNG_PERCEPTUAL_MAX_DISTANCE
                         else "png_mismatch"
                     )
                 else:

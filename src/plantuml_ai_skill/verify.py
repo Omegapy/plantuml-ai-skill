@@ -9,6 +9,9 @@ import xml.etree.ElementTree as ET
 import zlib
 
 
+PNG_PERCEPTUAL_MAX_DISTANCE = 5
+
+
 def _strip_unstable_svg_text(svg: str) -> str:
     svg = re.sub(r"<!--.*?-->", "", svg, flags=re.S)
     svg = re.sub(r"<\?xml[^>]*\?>", "", svg)
@@ -73,13 +76,28 @@ def png_hash_distance(left: bytes, right: bytes) -> int:
     return (png_average_hash(left) ^ png_average_hash(right)).bit_count()
 
 
-def png_perceptual_match(left: bytes, right: bytes, max_distance: int = 5) -> bool:
+def png_perceptual_match(
+    left: bytes,
+    right: bytes,
+    max_distance: int = PNG_PERCEPTUAL_MAX_DISTANCE,
+) -> bool:
     return png_hash_distance(left, right) <= max_distance
 
 
 def png_dimensions(png_bytes: bytes) -> tuple[int, int]:
-    width, height, _ = _decode_png_grayscale(png_bytes)
-    return width, height
+    if not png_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError("not a PNG file")
+    offset = 8
+    while offset + 12 <= len(png_bytes):
+        length = struct.unpack(">I", png_bytes[offset : offset + 4])[0]
+        chunk_type = png_bytes[offset + 4 : offset + 8]
+        chunk_data = png_bytes[offset + 8 : offset + 8 + length]
+        offset += 12 + length
+        if chunk_type == b"IHDR":
+            return struct.unpack(">II", chunk_data[:8])
+        if chunk_type == b"IEND":
+            break
+    raise ValueError("PNG is missing IHDR dimensions")
 
 
 def _decode_png_grayscale(png_bytes: bytes) -> tuple[int, int, list[int]]:

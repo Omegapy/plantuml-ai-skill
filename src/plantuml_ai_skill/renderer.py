@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+from typing import Iterable
 
 from .constants import DEFAULT_JAR_PATH, PLANTUML_VERSION
 
@@ -109,11 +110,44 @@ class PlantUMLRenderer:
         )
         return command
 
+    def command_for_batch(
+        self,
+        output_format: str,
+        output_dir: Path | str,
+        input_paths: Iterable[Path | str],
+    ) -> list[str]:
+        command = [
+            self.java_bin,
+            "-Djava.awt.headless=true",
+            "-DPLANTUML_SECURITY_PROFILE=SANDBOX",
+        ]
+        if self.include_roots:
+            include_path = os.pathsep.join(str(root) for root in self.include_roots)
+            command.append(f"-Dplantuml.include.path={include_path}")
+        command.extend(
+            [
+                "-jar",
+                str(self.jar_path),
+                output_format,
+                "-charset",
+                "UTF-8",
+                "-o",
+                str(output_dir),
+            ]
+        )
+        command.extend(str(path) for path in input_paths)
+        return command
+
     def _render(self, puml_text: str, output_format: str) -> RenderResult:
         command = self.command_for(output_format)
         return self._run(command, input_text=puml_text)
 
-    def _run(self, command: list[str], input_text: str) -> RenderResult:
+    def render_batch(self, input_paths: list[Path], output_format: str, output_dir: Path) -> RenderResult:
+        command = self.command_for_batch(output_format, output_dir, input_paths)
+        batch_timeout = max(self.timeout, self.timeout + (3 * len(input_paths)))
+        return self._run(command, input_text="", timeout=batch_timeout)
+
+    def _run(self, command: list[str], input_text: str, timeout: int | None = None) -> RenderResult:
         env = os.environ.copy()
         env.setdefault("GRAPHVIZ_DOT", self.graphviz_dot)
         try:
@@ -123,7 +157,7 @@ class PlantUMLRenderer:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 env=env,
-                timeout=self.timeout,
+                timeout=timeout or self.timeout,
                 check=False,
             )
         except FileNotFoundError as exc:

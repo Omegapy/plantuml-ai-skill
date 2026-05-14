@@ -19,7 +19,10 @@ INCLUDE_LINE_RE = re.compile(
 
 ICON_LIBRARY_HINTS = ("aws", "azure", "gcp", "k8s", "kubernetes", "material", "font-awesome")
 C4_HINTS = ("c4_", "c4-", "c4/")
-TRUSTED_C4_REMOTE_PREFIX = "/plantuml-stdlib/C4-PlantUML/master/"
+TRUSTED_C4_REMOTE_PREFIXES = (
+    "/plantuml-stdlib/C4-PlantUML/master/",
+    "/RicardoNiepel/C4-PlantUML/master/",
+)
 
 
 @dataclass(frozen=True)
@@ -215,6 +218,7 @@ def _include_candidates(target: str, roots: list[Path]) -> list[Path]:
         names.append(target_path.with_suffix(".puml"))
         names.append(target_path.with_suffix(".iuml"))
     names.extend(_c4_alias_names(target_path))
+    names.extend(_azure_alias_names(target_path))
     if target_path.is_absolute():
         return names
     candidates: list[Path] = []
@@ -232,9 +236,10 @@ def _trusted_remote_include_path(target: str, roots: list[Path]) -> Path | None:
     parsed = urlparse(target)
     if parsed.scheme != "https" or parsed.netloc.lower() != "raw.githubusercontent.com":
         return None
-    if not parsed.path.startswith(TRUSTED_C4_REMOTE_PREFIX):
+    prefix = next((value for value in TRUSTED_C4_REMOTE_PREFIXES if parsed.path.startswith(value)), "")
+    if not prefix:
         return None
-    relative = parsed.path.removeprefix(TRUSTED_C4_REMOTE_PREFIX)
+    relative = parsed.path.removeprefix(prefix)
     if "/" in relative or not relative.lower().endswith((".puml", ".iuml")):
         return None
     candidates = _include_candidates(relative, roots)
@@ -250,4 +255,16 @@ def _c4_alias_names(target_path: Path) -> list[Path]:
     if relative.suffix == "":
         aliases.append(relative.with_suffix(".puml"))
         aliases.append(relative.with_suffix(".iuml"))
+    return aliases
+
+
+def _azure_alias_names(target_path: Path) -> list[Path]:
+    parts = target_path.parts
+    if len(parts) < 2 or parts[0].lower() != "azurepuml":
+        return []
+    relative = Path(*parts[1:])
+    aliases = [relative, Path("dist") / relative]
+    if relative.suffix == "":
+        aliases.extend([relative.with_suffix(".puml"), relative.with_suffix(".iuml")])
+        aliases.extend([Path("dist") / relative.with_suffix(".puml"), Path("dist") / relative.with_suffix(".iuml")])
     return aliases

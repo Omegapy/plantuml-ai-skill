@@ -129,6 +129,21 @@ class ExtractionManifestTests(unittest.TestCase):
         self.assertTrue(resolutions[0].resolved_path)
         self.assertEqual("trusted_remote_mirrored", resolutions[0].reason)
 
+    def test_legacy_ricardo_c4_remote_include_maps_to_vendored_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            include = root / "C4_Component.puml"
+            include.write_text("' vendored C4 component\n", encoding="utf-8")
+            resolutions = resolve_include_deps(
+                [
+                    "https://raw.githubusercontent.com/RicardoNiepel/"
+                    "C4-PlantUML/master/C4_Component.puml"
+                ],
+                [root],
+            )
+        self.assertEqual(include.resolve(), resolutions[0].resolved_path)
+        self.assertEqual("trusted_remote_mirrored", resolutions[0].reason)
+
     def test_trusted_c4_remote_include_uses_vendor_roots_not_source_dir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             source_dir = Path(tmp)
@@ -150,6 +165,15 @@ class ExtractionManifestTests(unittest.TestCase):
             include = root / "C4_Container.puml"
             include.write_text("' vendored C4\n", encoding="utf-8")
             resolutions = resolve_include_deps(["<C4/C4_Container.puml>"], [root])
+        self.assertEqual(include.resolve(), resolutions[0].resolved_path)
+
+    def test_azurepuml_alias_maps_to_pinned_vendor_dist_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            include = root / "dist" / "Identity" / "AzureActiveDirectory.puml"
+            include.parent.mkdir(parents=True)
+            include.write_text("' vendored Azure include\n", encoding="utf-8")
+            resolutions = resolve_include_deps(["AzurePuml/Identity/AzureActiveDirectory.puml"], [root])
         self.assertEqual(include.resolve(), resolutions[0].resolved_path)
 
     def test_include_rewrite_uses_absolute_local_paths(self) -> None:

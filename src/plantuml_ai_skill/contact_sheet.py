@@ -6,6 +6,7 @@ from html import escape
 from pathlib import Path
 import shutil
 
+from .acquisition import SYNTHETIC_UML_DATASET_ID, SYNTHETIC_UML_DATASET_ROOT_NAME
 from .constants import PROJECT_ROOT
 from .manifest import CorpusRecord
 
@@ -98,6 +99,8 @@ def _reference_path(record: CorpusRecord, source_root: Path | str | None) -> Pat
         return Path(source_root) / record.published_render_path
     if record.source_name == "fixtures":
         return PROJECT_ROOT / "tests" / "fixtures" / record.published_render_path
+    if record.source_name == SYNTHETIC_UML_DATASET_ID:
+        return PROJECT_ROOT / "data" / "raw" / SYNTHETIC_UML_DATASET_ROOT_NAME / record.published_render_path
     return PROJECT_ROOT / "data" / "raw" / record.source_name / record.published_render_path
 
 

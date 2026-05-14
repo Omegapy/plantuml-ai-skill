@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
+from .acquisition import SYNTHETIC_UML_DATASET_ID
 from .curation import GOLD_EVAL_ALLOWED_VISUAL_CURATION_STATUSES
 from .license_policy import training_block_reason
 from .manifest import CorpusRecord, write_jsonl
@@ -38,7 +39,7 @@ def build_splits(
         "source_conditioned_eval": [],
         "augmentation": [],
     }
-    synthetic_count = 0
+    synthetic_augmentation: list[CorpusRecord] = []
     for _, group in sorted(by_repo.items()):
         for record in sorted(group, key=lambda item: item.id):
             if "source_conditioned_eval" in record.purpose and not promotion_block_reason(
@@ -50,19 +51,38 @@ def build_splits(
             if "renderer_regression" in record.purpose and not promotion_block_reason(record, "renderer_regression"):
                 splits["renderer_regression"].append(record)
             if "augmentation" in record.purpose:
-                if record.source_name == "synthetic-uml-diagram-dataset":
-                    if synthetic_count >= synthetic_cap:
-                        continue
-                    synthetic_count += 1
-                splits["augmentation"].append(record)
+                if record.source_name == SYNTHETIC_UML_DATASET_ID:
+                    synthetic_augmentation.append(record)
+                else:
+                    splits["augmentation"].append(record)
             elif "training" in record.purpose and not promotion_block_reason(record, "train"):
                 splits["train"].append(record)
+
+    splits["augmentation"].extend(_balanced_synthetic_augmentation(synthetic_augmentation, synthetic_cap))
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     for split_name, split_records in splits.items():
         write_jsonl(split_records, out / f"{split_name}.jsonl")
     return splits
+
+
+def _balanced_synthetic_augmentation(records: list[CorpusRecord], synthetic_cap: int) -> list[CorpusRecord]:
+    if synthetic_cap <= 0 or not records:
+        return []
+    buckets: dict[str, list[CorpusRecord]] = defaultdict(list)
+    for record in sorted(records, key=lambda item: (item.diagram_type, item.source_ref, item.id)):
+        buckets[record.diagram_type or "unknown"].append(record)
+    selected: list[CorpusRecord] = []
+    bucket_names = sorted(buckets)
+    cursor = 0
+    while len(selected) < synthetic_cap and any(buckets.values()):
+        name = bucket_names[cursor % len(bucket_names)]
+        cursor += 1
+        if not buckets[name]:
+            continue
+        selected.append(buckets[name].pop(0))
+    return selected
 
 
 def promotion_block_reason(record: CorpusRecord, split_name: str) -> str:

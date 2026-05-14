@@ -8,7 +8,13 @@ import json
 from pathlib import Path
 import sys
 
-from .acquisition import acquire_source, ensure_generated_dirs, vendor_include_source
+from .acquisition import (
+    SYNTHETIC_UML_DATASET_ID,
+    SYNTHETIC_UML_DATASET_ROOT_NAME,
+    acquire_source,
+    ensure_generated_dirs,
+    vendor_include_source,
+)
 from .assets import init_assets
 from .config import load_sources_config
 from .constants import DEFAULT_JAR_PATH, DEFAULT_LICENSE_BLOCKLIST_PATH, PROJECT_ROOT
@@ -52,6 +58,24 @@ def build_parser() -> argparse.ArgumentParser:
     acquire.add_argument("--source", required=True)
     acquire.add_argument("--output", default=str(PROJECT_ROOT / "data" / "manifests" / "source.jsonl"))
     acquire.add_argument("--dry-run", action="store_true")
+    acquire.add_argument(
+        "--subset",
+        action="append",
+        default=[],
+        help="synthetic dataset subset to acquire; may be passed multiple times",
+    )
+    acquire.add_argument(
+        "--partition",
+        action="append",
+        default=[],
+        help="synthetic dataset partition such as Train/1 or Test/Test_1; may be passed multiple times",
+    )
+    acquire.add_argument(
+        "--max-records-per-subset",
+        type=int,
+        default=0,
+        help="synthetic dataset cap per selected subset; 0 means no cap",
+    )
 
     vendor = sub.add_parser("vendor-includes", help="vendor include files from a configured source")
     vendor.add_argument("--source", default="c4-plantuml")
@@ -152,8 +176,25 @@ def main(argv: list[str] | None = None) -> int:
             print(f"PlantUML jar ready: {jar}")
             return 0
         if args.command == "acquire":
-            records = acquire_source(args.source, args.output, dry_run=args.dry_run)
+            acquisition_stats: dict[str, int] = {}
+            records = acquire_source(
+                args.source,
+                args.output,
+                dry_run=args.dry_run,
+                subsets=args.subset,
+                partitions=args.partition,
+                max_records_per_subset=args.max_records_per_subset,
+                acquisition_stats=acquisition_stats,
+            )
             print(f"Wrote {len(records)} records to {args.output}")
+            if acquisition_stats:
+                print(
+                    "Synthetic pairing stats: "
+                    f"paired={acquisition_stats.get('paired_records', 0)}; "
+                    f"txt_without_png={acquisition_stats.get('txt_without_png', 0)}; "
+                    f"png_without_txt={acquisition_stats.get('png_without_txt', 0)}; "
+                    f"skipped_by_cap={acquisition_stats.get('skipped_by_cap', 0)}"
+                )
             return 0
         if args.command == "vendor-includes":
             copied = vendor_include_source(args.source, args.output, force=args.force)
@@ -475,6 +516,8 @@ def _resolve_record_path(record: CorpusRecord, source_root: str) -> Path:
         return Path(source_root) / record.puml_path
     if record.source_name == "fixtures":
         return PROJECT_ROOT / "tests" / "fixtures" / record.puml_path
+    if record.source_name == SYNTHETIC_UML_DATASET_ID:
+        return PROJECT_ROOT / "data" / "raw" / SYNTHETIC_UML_DATASET_ROOT_NAME / record.puml_path
     return PROJECT_ROOT / "data" / "raw" / record.source_name / record.puml_path
 
 
@@ -483,6 +526,8 @@ def _resolve_reference_path(record: CorpusRecord, source_root: str) -> Path:
         return Path(source_root) / record.published_render_path
     if record.source_name == "fixtures":
         return PROJECT_ROOT / "tests" / "fixtures" / record.published_render_path
+    if record.source_name == SYNTHETIC_UML_DATASET_ID:
+        return PROJECT_ROOT / "data" / "raw" / SYNTHETIC_UML_DATASET_ROOT_NAME / record.published_render_path
     return PROJECT_ROOT / "data" / "raw" / record.source_name / record.published_render_path
 
 

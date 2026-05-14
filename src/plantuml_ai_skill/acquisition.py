@@ -15,7 +15,7 @@ from urllib.parse import unquote, urlparse
 
 from .config import SourceDefinition, load_sources_config
 from .constants import DEFAULT_LICENSE_OVERRIDES_PATH, PLANTUML_VERSION, PROJECT_ROOT
-from .extraction import ExtractedDiagram, extract_from_tree
+from .extraction import ExtractedDiagram, extract_from_file, extract_from_tree, stable_id
 from .license_policy import license_family, license_override_for_repo, load_license_overrides
 from .manifest import CorpusRecord, write_jsonl
 
@@ -27,6 +27,8 @@ PY2PUML_ITEM_RE = re.compile(
     re.MULTILINE,
 )
 REPO_PLANTUML_DATASET_ID = "repo-plantuml-dataset"
+SYNTHETIC_UML_DATASET_ID = "synthetic-uml-diagram-dataset"
+SYNTHETIC_UML_DATASET_ROOT_NAME = "PlantUML_Data"
 
 
 @dataclass(frozen=True)
@@ -188,6 +190,10 @@ def acquire_source(
     output_path: Path | str,
     dry_run: bool = False,
     raw_dir: Path | str = PROJECT_ROOT / "data" / "raw",
+    subsets: list[str] | None = None,
+    partitions: list[str] | None = None,
+    max_records_per_subset: int = 0,
+    acquisition_stats: dict[str, int] | None = None,
 ) -> list[CorpusRecord]:
     """Acquire one configured source.
 
@@ -198,20 +204,35 @@ def acquire_source(
     """
 
     if source_id == "fixtures":
+        _reject_synthetic_options(source_id, subsets, partitions, max_records_per_subset)
         return acquire_fixtures(output_path=output_path)
     config = load_sources_config()
     source = next((item for item in config.sources if item.id == source_id), None)
     if not source:
         raise ValueError(f"unknown source: {source_id}")
     if dry_run:
+        if source.id != SYNTHETIC_UML_DATASET_ID:
+            _reject_synthetic_options(source_id, subsets, partitions, max_records_per_subset)
         write_jsonl([], output_path)
         return []
     if source.id == REPO_PLANTUML_DATASET_ID:
+        _reject_synthetic_options(source_id, subsets, partitions, max_records_per_subset)
         return acquire_repo_plantuml_dataset(
             source,
             Path(raw_dir) / source.id,
             output_path,
         )
+    if source.id == SYNTHETIC_UML_DATASET_ID:
+        return acquire_synthetic_uml_diagram_dataset(
+            source,
+            Path(raw_dir) / SYNTHETIC_UML_DATASET_ROOT_NAME,
+            output_path,
+            subsets=subsets,
+            partitions=partitions,
+            max_records_per_subset=max_records_per_subset,
+            acquisition_stats=acquisition_stats,
+        )
+    _reject_synthetic_options(source_id, subsets, partitions, max_records_per_subset)
     staged_root = _stage_source(source, Path(raw_dir))
     source_commit = _git_commit(staged_root) if (staged_root / ".git").exists() else source.ref
     license_path = _find_license_file(staged_root)
@@ -234,6 +255,179 @@ def acquire_source(
         _attach_py2puml_python_sources(records, staged_root)
     write_jsonl(records, output_path)
     return records
+
+
+def acquire_synthetic_uml_diagram_dataset(
+    source: SourceDefinition,
+    dataset_root: Path | str,
+    output_path: Path | str,
+    subsets: list[str] | None = None,
+    partitions: list[str] | None = None,
+    max_records_per_subset: int = 0,
+    acquisition_stats: dict[str, int] | None = None,
+) -> list[CorpusRecord]:
+    """Acquire same-stem PlantUML text and PNG pairs from a staged synthetic dataset."""
+
+    root = Path(dataset_root)
+    if not root.exists():
+        raise RuntimeError(f"{source.id} must be staged under {root}")
+    if max_records_per_subset < 0:
+        raise ValueError("max_records_per_subset must be >= 0")
+
+    subset_filters = {item for item in subsets or [] if item}
+    partition_filters = {_normalize_partition(item) for item in partitions or [] if item}
+    subset_dirs = [
+        path
+        for path in sorted(root.iterdir(), key=lambda item: item.name)
+        if path.is_dir() and (not subset_filters or path.name in subset_filters)
+    ]
+    missing_subsets = subset_filters - {path.name for path in subset_dirs}
+    if missing_subsets:
+        raise RuntimeError(
+            f"{source.id} subset(s) not found under {root}: {', '.join(sorted(missing_subsets))}"
+        )
+
+    stats = acquisition_stats if acquisition_stats is not None else {}
+    records: list[CorpusRecord] = []
+    stats.setdefault("paired_records", 0)
+    stats.setdefault("txt_without_png", 0)
+    stats.setdefault("png_without_txt", 0)
+    stats.setdefault("skipped_by_cap", 0)
+
+    for subset_dir in subset_dirs:
+        subset_count = 0
+        subset_png_stems = _synthetic_png_stems(subset_dir, partition_filters)
+        seen_txt_stems: set[str] = set()
+        for txt_path in sorted(subset_dir.rglob("*.txt")):
+            relative_txt = txt_path.relative_to(subset_dir)
+            if not _matches_partition(relative_txt.parent.as_posix(), partition_filters):
+                continue
+            relative_stem = relative_txt.with_suffix("").as_posix()
+            seen_txt_stems.add(relative_stem)
+            png_path = txt_path.with_suffix(".png")
+            if not png_path.exists():
+                stats["txt_without_png"] += 1
+                continue
+            if max_records_per_subset and subset_count >= max_records_per_subset:
+                stats["skipped_by_cap"] += 1
+                continue
+            diagrams = extract_from_file(txt_path, source.id)
+            paired = [diagram for diagram in diagrams if diagram.published_render_path == png_path]
+            if not paired:
+                stats["txt_without_png"] += 1
+                continue
+            for diagram in paired:
+                records.append(_synthetic_record(source, root, subset_dir, txt_path, png_path, diagram))
+                subset_count += 1
+                stats["paired_records"] += 1
+                if max_records_per_subset and subset_count >= max_records_per_subset:
+                    break
+
+        stats["png_without_txt"] += len(subset_png_stems - seen_txt_stems)
+
+    write_jsonl(records, output_path)
+    return records
+
+
+def _synthetic_record(
+    source: SourceDefinition,
+    dataset_root: Path,
+    subset_dir: Path,
+    txt_path: Path,
+    png_path: Path,
+    diagram: ExtractedDiagram,
+) -> CorpusRecord:
+    relative_txt = txt_path.relative_to(dataset_root)
+    relative_png = png_path.relative_to(dataset_root)
+    relative_to_subset = txt_path.relative_to(subset_dir)
+    partition = relative_to_subset.parent.as_posix()
+    split = relative_to_subset.parts[0] if relative_to_subset.parts else ""
+    shard = "/".join(relative_to_subset.parts[1:-1])
+    content_sha1 = hashlib.sha1(diagram.text.encode("utf-8", errors="replace")).hexdigest()
+    include_deps = diagram.include_deps
+    return CorpusRecord(
+        id=stable_id(source.id, relative_txt, diagram.text),
+        source_name=source.id,
+        source_url=source.url,
+        source_kind=source.kind,
+        source_ref=subset_dir.name,
+        license="verify-on-clone",
+        license_family=license_family("verify-on-clone"),
+        diagram_type=_synthetic_diagram_type(subset_dir.name, diagram.diagram_type),
+        puml_path=str(relative_txt),
+        published_render_path=str(relative_png),
+        python_source_paths=[],
+        include_deps=include_deps,
+        is_self_contained=not include_deps,
+        uses_include=bool(include_deps),
+        uses_icon_library=diagram.uses_icon_library,
+        plantuml_version=PLANTUML_VERSION,
+        graphviz_version="",
+        render_status="not_rendered",
+        render_hash_svg="",
+        render_hash_png="",
+        verification_status="not_verified",
+        render_fail_reason="",
+        purpose=list(source.default_purpose),
+        attribution=source.name,
+        license_path="",
+        source_commit=source.ref,
+        source_repo_url=source.url,
+        extra={
+            "block_index": diagram.block_index,
+            "content_sha1": content_sha1,
+            "dataset_subset": subset_dir.name,
+            "dataset_split": split,
+            "dataset_shard": shard,
+            "dataset_partition": partition,
+            "dataset_repo_path": str(relative_txt),
+            "published_render_pairing_status": "same_basename",
+        },
+    )
+
+
+def _synthetic_png_stems(subset_dir: Path, partition_filters: set[str]) -> set[str]:
+    stems: set[str] = set()
+    for png_path in sorted(subset_dir.rglob("*.png")):
+        relative_png = png_path.relative_to(subset_dir)
+        if _matches_partition(relative_png.parent.as_posix(), partition_filters):
+            stems.add(relative_png.with_suffix("").as_posix())
+    return stems
+
+
+def _synthetic_diagram_type(subset_name: str, fallback: str) -> str:
+    if "_Act_" in subset_name:
+        return "activity"
+    if "_Seq_" in subset_name:
+        return "sequence"
+    return fallback
+
+
+def _normalize_partition(value: str) -> str:
+    return Path(value.strip("/")).as_posix()
+
+
+def _matches_partition(relative_parent: str, partition_filters: set[str]) -> bool:
+    if not partition_filters:
+        return True
+    normalized_parent = _normalize_partition(relative_parent)
+    return any(
+        normalized_parent == partition or normalized_parent.startswith(f"{partition}/")
+        for partition in partition_filters
+    )
+
+
+def _reject_synthetic_options(
+    source_id: str,
+    subsets: list[str] | None,
+    partitions: list[str] | None,
+    max_records_per_subset: int,
+) -> None:
+    if subsets or partitions or max_records_per_subset:
+        raise ValueError(
+            "--subset, --partition, and --max-records-per-subset are only supported "
+            f"for {SYNTHETIC_UML_DATASET_ID}, not {source_id}"
+        )
 
 
 def acquire_repo_plantuml_dataset(

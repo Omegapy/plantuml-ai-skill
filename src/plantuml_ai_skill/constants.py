@@ -59,6 +59,7 @@ REPORT_RECOMMENDED_SOURCES = {
     "coni2k-plantuml-reference",
     "plantuml-test",
     "pdiff",
+    "azure-plantuml",
 }
 
 REPORT_RECOMMENDED_FEATURES = {

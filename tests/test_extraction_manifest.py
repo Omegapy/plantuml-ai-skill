@@ -144,6 +144,14 @@ class ExtractionManifestTests(unittest.TestCase):
         self.assertIsNone(resolutions[0].resolved_path)
         self.assertEqual("remote_include_blocked", resolutions[0].reason)
 
+    def test_c4_angle_include_alias_maps_to_flat_vendor_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            include = root / "C4_Container.puml"
+            include.write_text("' vendored C4\n", encoding="utf-8")
+            resolutions = resolve_include_deps(["<C4/C4_Container.puml>"], [root])
+        self.assertEqual(include.resolve(), resolutions[0].resolved_path)
+
     def test_include_rewrite_uses_absolute_local_paths(self) -> None:
         resolutions = resolve_include_deps(["c4_fixture_container_include.puml"], [FIXTURES / "vendor" / "c4"])
         rewritten = rewrite_includes_to_local_paths(

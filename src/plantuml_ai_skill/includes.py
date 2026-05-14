@@ -214,6 +214,7 @@ def _include_candidates(target: str, roots: list[Path]) -> list[Path]:
     if target_path.suffix == "":
         names.append(target_path.with_suffix(".puml"))
         names.append(target_path.with_suffix(".iuml"))
+    names.extend(_c4_alias_names(target_path))
     if target_path.is_absolute():
         return names
     candidates: list[Path] = []
@@ -238,3 +239,15 @@ def _trusted_remote_include_path(target: str, roots: list[Path]) -> Path | None:
         return None
     candidates = _include_candidates(relative, roots)
     return next((candidate for candidate in candidates if candidate.exists()), None)
+
+
+def _c4_alias_names(target_path: Path) -> list[Path]:
+    parts = target_path.parts
+    if not parts or parts[0].lower() != "c4":
+        return []
+    relative = Path(*parts[1:])
+    aliases = [relative]
+    if relative.suffix == "":
+        aliases.append(relative.with_suffix(".puml"))
+        aliases.append(relative.with_suffix(".iuml"))
+    return aliases

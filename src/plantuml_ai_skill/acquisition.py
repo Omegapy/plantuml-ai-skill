@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
 import re
 import shutil
 import subprocess
 from typing import Iterable
 import urllib.request
+from urllib.parse import unquote, urlparse
 
 from .config import SourceDefinition, load_sources_config
-from .constants import PLANTUML_VERSION, PROJECT_ROOT
+from .constants import DEFAULT_LICENSE_OVERRIDES_PATH, PLANTUML_VERSION, PROJECT_ROOT
 from .extraction import ExtractedDiagram, extract_from_tree
-from .license_policy import license_family
+from .license_policy import license_family, license_override_for_repo, load_license_overrides
 from .manifest import CorpusRecord, write_jsonl
 
 
@@ -23,6 +26,7 @@ PY2PUML_ITEM_RE = re.compile(
     r"(?P<fqn>[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)+)",
     re.MULTILINE,
 )
+REPO_PLANTUML_DATASET_ID = "repo-plantuml-dataset"
 
 
 @dataclass(frozen=True)
@@ -30,6 +34,21 @@ class SourcePairing:
     paths: list[Path]
     confidence: str
     reason: str
+
+
+@dataclass(frozen=True)
+class RepoPlantUmlMetadata:
+    repo_name: str
+    extension: str
+    puml_file_links: list[str]
+    language: str
+    stargazers_count: str
+    forks_count: str
+    open_issues_count: str
+    watchers_count: str
+    created_at: str
+    updated_at: str
+    size_kb: str
 
 
 def records_from_diagrams(
@@ -187,6 +206,12 @@ def acquire_source(
     if dry_run:
         write_jsonl([], output_path)
         return []
+    if source.id == REPO_PLANTUML_DATASET_ID:
+        return acquire_repo_plantuml_dataset(
+            source,
+            Path(raw_dir) / source.id,
+            output_path,
+        )
     staged_root = _stage_source(source, Path(raw_dir))
     source_commit = _git_commit(staged_root) if (staged_root / ".git").exists() else source.ref
     license_path = _find_license_file(staged_root)
@@ -209,6 +234,198 @@ def acquire_source(
         _attach_py2puml_python_sources(records, staged_root)
     write_jsonl(records, output_path)
     return records
+
+
+def acquire_repo_plantuml_dataset(
+    source: SourceDefinition,
+    dataset_root: Path | str,
+    output_path: Path | str,
+    license_overrides_path: Path | str = DEFAULT_LICENSE_OVERRIDES_PATH,
+) -> list[CorpusRecord]:
+    """Acquire a manually staged Repo-PlantUML-Dataset checkout.
+
+    The staged tree keeps source files under ``data/<owner>__<repo>/...`` and
+    attribution metadata in ``metadata.csv``. Records remain training
+    candidates, but default to ``verify-on-clone`` until a repo-level override
+    explicitly records a permissive license.
+    """
+
+    staged_root = Path(dataset_root)
+    data_root = staged_root / "data"
+    metadata_path = staged_root / "metadata.csv"
+    if not data_root.exists() or not metadata_path.exists():
+        raise RuntimeError(
+            f"{source.id} must be staged with data/ and metadata.csv under {staged_root}"
+        )
+
+    metadata_by_repo = _load_repo_plantuml_metadata(metadata_path)
+    source_urls_by_path = _repo_dataset_urls_by_path(data_root, metadata_by_repo.values())
+    license_overrides = load_license_overrides(license_overrides_path)
+    dataset_commit = _git_commit(staged_root) if (staged_root / ".git").exists() else source.ref
+    records: list[CorpusRecord] = []
+
+    for diagram in extract_from_tree(data_root, source_name=source.id):
+        support_reason = _repo_dataset_support_file_reason(diagram, data_root)
+        if support_reason:
+            continue
+        relative_to_data = diagram.path.relative_to(data_root)
+        repo_folder = relative_to_data.parts[0]
+        repo_name = repo_folder.replace("__", "/")
+        metadata = metadata_by_repo.get(repo_name)
+        original_url = source_urls_by_path.get(diagram.path.resolve(), "")
+        override = license_override_for_repo(repo_name, license_overrides)
+        license_text = override.license if override else "verify-on-clone"
+        render_path = ""
+        if diagram.published_render_path:
+            render_path = str(diagram.published_render_path.relative_to(staged_root))
+        extra = {
+            "block_index": diagram.block_index,
+            "repo_name": repo_name,
+            "original_puml_url": original_url,
+            "dataset_commit": dataset_commit,
+            "dataset_repo_path": str(relative_to_data),
+            "content_sha1": hashlib.sha1(
+                diagram.text.encode("utf-8", errors="replace")
+            ).hexdigest(),
+        }
+        if metadata:
+            extra.update(_repo_metadata_extra(metadata))
+        if override and override.notes:
+            extra["license_override_notes"] = override.notes
+        if diagram.published_render_pairing_status:
+            extra["published_render_pairing_status"] = diagram.published_render_pairing_status
+        records.append(
+            CorpusRecord(
+                id=diagram.id,
+                source_name=source.id,
+                source_url=original_url or source.url,
+                source_kind=source.kind,
+                source_ref=repo_name,
+                license=license_text,
+                license_family=license_family(license_text),
+                diagram_type=diagram.diagram_type,
+                puml_path=str(diagram.path.relative_to(staged_root)),
+                published_render_path=render_path,
+                python_source_paths=[],
+                include_deps=diagram.include_deps,
+                is_self_contained=diagram.is_self_contained,
+                uses_include=bool(diagram.include_deps),
+                uses_icon_library=diagram.uses_icon_library,
+                plantuml_version=PLANTUML_VERSION,
+                graphviz_version="",
+                render_status="not_rendered",
+                render_hash_svg="",
+                render_hash_png="",
+                verification_status="not_verified",
+                render_fail_reason="",
+                purpose=list(source.default_purpose),
+                attribution=repo_name,
+                license_path=override.license_path if override else "",
+                source_commit=dataset_commit,
+                source_repo_url=f"https://github.com/{repo_name}",
+                extra=extra,
+            )
+        )
+    write_jsonl(records, output_path)
+    return records
+
+
+def _load_repo_plantuml_metadata(path: Path) -> dict[str, RepoPlantUmlMetadata]:
+    rows: dict[str, RepoPlantUmlMetadata] = {}
+    with path.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            repo_name = str(row.get("repo_name", "")).strip()
+            if not repo_name:
+                continue
+            rows[repo_name] = RepoPlantUmlMetadata(
+                repo_name=repo_name,
+                extension=str(row.get("extension", "")),
+                puml_file_links=[
+                    item.strip()
+                    for item in str(row.get("puml_file_links", "")).split(";")
+                    if item.strip()
+                ],
+                language=str(row.get("language", "")),
+                stargazers_count=str(row.get("stargazers_count", "")),
+                forks_count=str(row.get("forks_count", "")),
+                open_issues_count=str(row.get("open_issues_count", "")),
+                watchers_count=str(row.get("watchers_count", "")),
+                created_at=str(row.get("created_at", "")),
+                updated_at=str(row.get("updated_at", "")),
+                size_kb=str(row.get("size_kb", "")),
+            )
+    return rows
+
+
+def _repo_dataset_urls_by_path(
+    data_root: Path,
+    metadata_rows: Iterable[RepoPlantUmlMetadata],
+) -> dict[Path, str]:
+    urls: dict[Path, str] = {}
+    for metadata in metadata_rows:
+        for url in metadata.puml_file_links:
+            local_path = _repo_dataset_local_path_for_raw_url(data_root, metadata.repo_name, url)
+            if local_path and local_path.exists():
+                urls[local_path.resolve()] = url
+    return urls
+
+
+def _repo_dataset_local_path_for_raw_url(
+    data_root: Path,
+    repo_name: str,
+    url: str,
+) -> Path | None:
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.netloc.lower() != "raw.githubusercontent.com":
+        return None
+    parts = [unquote(part) for part in parsed.path.strip("/").split("/") if part]
+    if len(parts) < 4:
+        return None
+    if f"{parts[0]}/{parts[1]}".lower() != repo_name.lower():
+        return None
+    repo_root = data_root / repo_name.replace("/", "__")
+    relative_path = Path(*parts[3:])
+    candidate = repo_root / relative_path
+    if candidate.exists():
+        return candidate
+    matches = [
+        path
+        for path in repo_root.rglob(relative_path.name)
+        if path.is_file() and path.as_posix().endswith(relative_path.as_posix())
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _repo_metadata_extra(metadata: RepoPlantUmlMetadata) -> dict[str, str]:
+    return {
+        "repo_language": metadata.language,
+        "repo_stars": metadata.stargazers_count,
+        "repo_forks": metadata.forks_count,
+        "repo_open_issues": metadata.open_issues_count,
+        "repo_watchers": metadata.watchers_count,
+        "repo_created_at": metadata.created_at,
+        "repo_updated_at": metadata.updated_at,
+        "repo_size_kb": metadata.size_kb,
+        "repo_declared_extensions": metadata.extension,
+    }
+
+
+def _repo_dataset_support_file_reason(diagram: ExtractedDiagram, data_root: Path) -> str:
+    text = diagram.text.strip()
+    if not text:
+        return "empty_file"
+    relative = diagram.path.relative_to(data_root)
+    parts = {part.lower() for part in relative.parts}
+    name = diagram.path.name.lower()
+    if name in {"style.puml", "styles.puml"}:
+        return "style_include"
+    if name.startswith("puml-theme-") or "plantuml-config" in name:
+        return "theme_or_config_include"
+    if {"includes", "partials"} & parts:
+        return "include_partial"
+    if "lib" in parts and (name == "c4.puml" or name.startswith("c4_")):
+        return "c4_library_include"
+    return ""
 
 
 def vendor_include_source(

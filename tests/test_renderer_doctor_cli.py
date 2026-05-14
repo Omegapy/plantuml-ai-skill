@@ -1,3 +1,6 @@
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+import json
 from pathlib import Path
 import os
 import tempfile
@@ -179,6 +182,8 @@ class RendererDoctorCliTests(unittest.TestCase):
                     str(fake_jar),
                     "--batch-size",
                     "2",
+                    "--progress-interval",
+                    "0",
                 ]
             )
             updated = read_jsonl(output)
@@ -191,6 +196,81 @@ class RendererDoctorCliTests(unittest.TestCase):
         self.assertTrue(first_svg_exists)
         self.assertTrue(second_svg_exists)
         self.assertEqual(first_svg_path, updated[0].extra["rendered_svg_path"])
+
+    def test_cli_render_batch_progress_uses_stderr_and_keeps_jsonl_valid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source = tmp_path / "source"
+            rendered = tmp_path / "rendered"
+            source.mkdir()
+            (source / "first.puml").write_text("@startuml\nAlice -> Bob: hi\n@enduml\n", encoding="utf-8")
+            (source / "second.puml").write_text("@startuml\nBob -> Alice: ok\n@enduml\n", encoding="utf-8")
+            fake_java = tmp_path / "java"
+            fake_jar = tmp_path / "plantuml.jar"
+            fake_jar.write_text("fake", encoding="utf-8")
+            fake_java.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/bin/sh
+                    out=""
+                    ext=""
+                    while [ "$#" -gt 0 ]; do
+                      case "$1" in
+                        -o) out="$2"; shift 2 ;;
+                        -tsvg) ext="svg"; shift ;;
+                        *.puml)
+                          base=$(basename "$1" .puml)
+                          mkdir -p "$out"
+                          printf '<svg xmlns="http://www.w3.org/2000/svg"><text>%s-%s</text></svg>' "$base" "$ext" > "$out/$base.svg"
+                          shift
+                          ;;
+                        *) shift ;;
+                      esac
+                    done
+                    exit 0
+                    """
+                ),
+                encoding="utf-8",
+            )
+            os.chmod(fake_java, 0o755)
+            manifest = tmp_path / "manifest.jsonl"
+            output = tmp_path / "rendered.jsonl"
+            records = [
+                _local_record("record-one", "first.puml", source),
+                _local_record("record-two", "second.puml", source),
+            ]
+            write_jsonl(records, manifest)
+
+            stdout = StringIO()
+            stderr = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                status = main(
+                    [
+                        "render",
+                        "--manifest",
+                        str(manifest),
+                        "--source-root",
+                        str(source),
+                        "--output",
+                        str(output),
+                        "--render-dir",
+                        str(rendered),
+                        "--java",
+                        str(fake_java),
+                        "--jar",
+                        str(fake_jar),
+                        "--batch-size",
+                        "2",
+                    ]
+                )
+            jsonl_lines = output.read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(0, status)
+        self.assertIn("render progress:", stderr.getvalue())
+        self.assertNotIn("render progress:", stdout.getvalue())
+        self.assertEqual(2, len(jsonl_lines))
+        for line in jsonl_lines:
+            json.loads(line)
 
     def test_cli_coverage_and_fixture_acquire(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

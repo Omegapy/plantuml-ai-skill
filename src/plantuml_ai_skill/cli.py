@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 import json
 from pathlib import Path
 import sys
 import tempfile
+import time
 
 from .acquisition import (
     SYNTHETIC_UML_DATASET_ID,
@@ -110,6 +112,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="render records in PlantUML file batches; 1 keeps the per-record pipe renderer",
     )
     render.add_argument(
+        "--progress-interval",
+        type=int,
+        default=None,
+        help=(
+            "write render progress telemetry to stderr every N records; 0 disables progress output; "
+            "defaults to 100 in batched mode and off in serial mode"
+        ),
+    )
+    render.add_argument(
         "--include-root",
         action="append",
         default=[],
@@ -120,6 +131,27 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--manifest", required=True)
     verify.add_argument("--source-root", default="")
     verify.add_argument("--output", default=str(PROJECT_ROOT / "data" / "manifests" / "verified.jsonl"))
+    verify.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="parallel verifier worker processes; 1 keeps the serial verifier",
+    )
+    verify.add_argument(
+        "--progress-interval",
+        type=int,
+        default=None,
+        help=(
+            "write progress telemetry to stderr every N records; 0 disables progress output; "
+            "defaults to 100 in parallel mode and off in serial mode"
+        ),
+    )
+    verify.add_argument(
+        "--chunk-size",
+        type=int,
+        default=0,
+        help="records per parallel worker task; 0 chooses a conservative default",
+    )
 
     audit = sub.add_parser("audit-licenses", help="summarize license families in a manifest")
     audit.add_argument("--manifest", required=True)
@@ -312,6 +344,7 @@ def _render(args: argparse.Namespace) -> int:
     render_dir = Path(args.render_dir)
     render_dir.mkdir(parents=True, exist_ok=True)
     batch_size = max(1, int(args.batch_size or 1))
+    progress_interval = _render_progress_interval(args.progress_interval, batch_size)
     if batch_size > 1:
         return _render_batched(
             records,
@@ -321,8 +354,17 @@ def _render(args: argparse.Namespace) -> int:
             args.source_root,
             include_roots,
             batch_size,
+            progress_interval,
         )
-    return _render_serial(records, renderer, render_dir, args.output, args.source_root, include_roots)
+    return _render_serial(
+        records,
+        renderer,
+        render_dir,
+        args.output,
+        args.source_root,
+        include_roots,
+        progress_interval,
+    )
 
 
 def _render_serial(
@@ -332,7 +374,9 @@ def _render_serial(
     output: str,
     source_root: str,
     include_roots: list[Path],
+    progress_interval: int,
 ) -> int:
+    progress = _RenderProgress(len(records), progress_interval)
     updated: list[CorpusRecord] = []
     for record in records:
         try:
@@ -366,6 +410,7 @@ def _render_serial(
             record.render_status = "failed"
             record.render_fail_reason = str(exc)
         updated.append(record)
+        progress.record(record)
     write_jsonl(updated, output)
     failed = sum(record.render_status == "failed" for record in updated)
     rendered = sum(record.render_status == "ok" for record in updated)
@@ -381,6 +426,39 @@ class _BatchRenderItem:
     puml_text: str
 
 
+class _RenderProgress:
+    def __init__(self, total: int, interval: int) -> None:
+        self.total = total
+        self.interval = max(0, interval)
+        self.started_at = time.monotonic()
+        self.processed = 0
+        self.counts: Counter[str] = Counter()
+
+    def record(self, record: CorpusRecord) -> None:
+        self.processed += 1
+        if record.render_status == "ok":
+            self.counts["rendered"] += 1
+        elif record.render_status == "failed":
+            self.counts["failed"] += 1
+        elif record.render_status == "skipped":
+            self.counts["skipped"] += 1
+        if self.interval and (self.processed % self.interval == 0 or self.processed == self.total):
+            self.emit()
+
+    def emit(self) -> None:
+        elapsed = max(time.monotonic() - self.started_at, 1e-9)
+        rows_per_minute = self.processed * 60 / elapsed
+        print(
+            "render progress: "
+            f"processed={self.processed}/{self.total} "
+            f"rendered={self.counts['rendered']} "
+            f"failed={self.counts['failed']} "
+            f"skipped={self.counts['skipped']} "
+            f"rows/minute={rows_per_minute:.1f}",
+            file=sys.stderr,
+        )
+
+
 def _render_batched(
     records: list[CorpusRecord],
     renderer: PlantUMLRenderer,
@@ -389,7 +467,9 @@ def _render_batched(
     source_root: str,
     include_roots: list[Path],
     batch_size: int,
+    progress_interval: int,
 ) -> int:
+    progress = _RenderProgress(len(records), progress_interval)
     updated: list[CorpusRecord | None] = [None] * len(records)
     batch: list[_BatchRenderItem] = []
     for index, record in enumerate(records):
@@ -397,21 +477,27 @@ def _render_batched(
             puml_text = _prepare_render_text(record, source_root, include_roots)
             if record.render_status == "skipped":
                 updated[index] = record
+                progress.record(record)
                 continue
             batch.append(_BatchRenderItem(index=index, record=record, puml_text=puml_text))
             if len(batch) >= batch_size:
                 _render_batch(batch, renderer, render_dir)
                 for item in batch:
                     updated[item.index] = item.record
+                    progress.record(item.record)
                 batch = []
         except Exception as exc:
             record.render_status = "failed"
             record.render_fail_reason = str(exc)
             updated[index] = record
+            progress.record(record)
     if batch:
         _render_batch(batch, renderer, render_dir)
         for item in batch:
             updated[item.index] = item.record
+            progress.record(item.record)
+    if any(record is None for record in updated):
+        raise RuntimeError("batched renderer did not return every input record")
     output_records = [record for record in updated if record is not None]
     write_jsonl(output_records, output)
     failed = sum(record.render_status == "failed" for record in output_records)
@@ -518,45 +604,60 @@ def _plantuml_error_svg(svg_bytes: bytes) -> bool:
     return "Syntax Error" in text or "Some diagram description contains errors" in text
 
 
+@dataclass(frozen=True)
+class _VerifyWorkItem:
+    index: int
+    record: CorpusRecord
+    source_root: str
+
+
+class _VerifyProgress:
+    def __init__(self, total: int, interval: int) -> None:
+        self.total = total
+        self.interval = max(0, interval)
+        self.started_at = time.monotonic()
+        self.processed = 0
+        self.counts: Counter[str] = Counter()
+
+    def record(self, record: CorpusRecord) -> None:
+        self.processed += 1
+        status = record.verification_status
+        if status.endswith("_match"):
+            self.counts["match"] += 1
+        elif status.endswith("_mismatch"):
+            self.counts["mismatch"] += 1
+        elif status in {"verify_error", "render_skipped", "render_failed"}:
+            self.counts[status] += 1
+        if self.interval and (self.processed % self.interval == 0 or self.processed == self.total):
+            self.emit()
+
+    def emit(self) -> None:
+        elapsed = max(time.monotonic() - self.started_at, 1e-9)
+        rows_per_minute = self.processed * 60 / elapsed
+        print(
+            "verify progress: "
+            f"processed={self.processed}/{self.total} "
+            f"match={self.counts['match']} "
+            f"mismatch={self.counts['mismatch']} "
+            f"verify_error={self.counts['verify_error']} "
+            f"render_skipped={self.counts['render_skipped']} "
+            f"render_failed={self.counts['render_failed']} "
+            f"rows/minute={rows_per_minute:.1f}",
+            file=sys.stderr,
+        )
+
+
 def _verify(args: argparse.Namespace) -> int:
     records = read_jsonl(args.manifest)
-    updated: list[CorpusRecord] = []
-    for record in records:
-        try:
-            if record.render_status == "failed":
-                record.verification_status = "render_failed"
-            elif record.render_status == "skipped":
-                record.verification_status = "render_skipped"
-            elif not record.published_render_path:
-                record.verification_status = "rendered_no_reference" if record.render_hash_svg else "not_verified"
-            else:
-                reference_path = _resolve_reference_path(record, args.source_root)
-                if reference_path.suffix.lower() == ".svg":
-                    rendered_path = _rendered_output_path(record, "svg")
-                    record.verification_status = (
-                        "svg_match"
-                        if svg_matches(rendered_path.read_bytes(), reference_path.read_bytes())
-                        else "svg_mismatch"
-                    )
-                elif reference_path.suffix.lower() == ".png":
-                    rendered_path = _rendered_output_path(record, "png")
-                    rendered_bytes = rendered_path.read_bytes()
-                    reference_bytes = reference_path.read_bytes()
-                    distance = png_hash_distance(rendered_bytes, reference_bytes)
-                    record.extra["png_hash_distance"] = str(distance)
-                    record.extra["rendered_png_dimensions"] = _dimensions_label(png_dimensions(rendered_bytes))
-                    record.extra["published_png_dimensions"] = _dimensions_label(png_dimensions(reference_bytes))
-                    record.verification_status = (
-                        "png_match"
-                        if distance <= PNG_PERCEPTUAL_MAX_DISTANCE
-                        else "png_mismatch"
-                    )
-                else:
-                    record.verification_status = "unsupported_reference_format"
-        except Exception as exc:
-            record.verification_status = "verify_error"
-            record.render_fail_reason = str(exc)
-        updated.append(record)
+    workers = max(1, int(args.workers or 1))
+    progress_interval = _verify_progress_interval(args.progress_interval, workers)
+    if workers == 1:
+        updated = _verify_serial(records, args.source_root, progress_interval)
+    else:
+        chunk_size = int(args.chunk_size or 0)
+        if chunk_size <= 0:
+            chunk_size = _default_verify_chunk_size(len(records), workers)
+        updated = _verify_parallel(records, args.source_root, workers, progress_interval, chunk_size)
     write_jsonl(updated, args.output)
     failures = sum(
         record.verification_status.endswith("mismatch") or record.verification_status == "verify_error"
@@ -566,6 +667,114 @@ def _verify(args: argparse.Namespace) -> int:
     checked = len(updated) - skipped
     print(f"Verified {checked - failures}/{checked} rendered records; skipped {skipped}; wrote {args.output}")
     return 0 if failures == 0 else 1
+
+
+def _verify_serial(records: list[CorpusRecord], source_root: str, progress_interval: int) -> list[CorpusRecord]:
+    progress = _VerifyProgress(len(records), progress_interval)
+    updated: list[CorpusRecord] = []
+    for record in records:
+        updated_record = _verify_record(record, source_root)
+        updated.append(updated_record)
+        progress.record(updated_record)
+    return updated
+
+
+def _verify_parallel(
+    records: list[CorpusRecord],
+    source_root: str,
+    workers: int,
+    progress_interval: int,
+    chunk_size: int,
+) -> list[CorpusRecord]:
+    updated: list[CorpusRecord | None] = [None] * len(records)
+    progress = _VerifyProgress(len(records), progress_interval)
+    chunks = list(_verify_work_chunks(records, source_root, max(1, chunk_size)))
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(_verify_chunk, chunk) for chunk in chunks]
+        for future in as_completed(futures):
+            for index, record in future.result():
+                updated[index] = record
+                progress.record(record)
+    if any(record is None for record in updated):
+        raise RuntimeError("parallel verifier did not return every input record")
+    return [record for record in updated if record is not None]
+
+
+def _verify_record(record: CorpusRecord, source_root: str) -> CorpusRecord:
+    try:
+        if record.render_status == "failed":
+            record.verification_status = "render_failed"
+        elif record.render_status == "skipped":
+            record.verification_status = "render_skipped"
+        elif not record.published_render_path:
+            record.verification_status = "rendered_no_reference" if record.render_hash_svg else "not_verified"
+        else:
+            reference_path = _resolve_reference_path(record, source_root)
+            if reference_path.suffix.lower() == ".svg":
+                rendered_path = _rendered_output_path(record, "svg")
+                record.verification_status = (
+                    "svg_match"
+                    if svg_matches(rendered_path.read_bytes(), reference_path.read_bytes())
+                    else "svg_mismatch"
+                )
+            elif reference_path.suffix.lower() == ".png":
+                rendered_path = _rendered_output_path(record, "png")
+                rendered_bytes = rendered_path.read_bytes()
+                reference_bytes = reference_path.read_bytes()
+                distance = png_hash_distance(rendered_bytes, reference_bytes)
+                record.extra["png_hash_distance"] = str(distance)
+                record.extra["rendered_png_dimensions"] = _dimensions_label(png_dimensions(rendered_bytes))
+                record.extra["published_png_dimensions"] = _dimensions_label(png_dimensions(reference_bytes))
+                record.verification_status = (
+                    "png_match" if distance <= PNG_PERCEPTUAL_MAX_DISTANCE else "png_mismatch"
+                )
+            else:
+                record.verification_status = "unsupported_reference_format"
+    except Exception as exc:
+        record.verification_status = "verify_error"
+        record.render_fail_reason = str(exc)
+    return record
+
+
+def _verify_chunk(chunk: list[_VerifyWorkItem]) -> list[tuple[int, CorpusRecord]]:
+    return [_verify_indexed_record(item) for item in chunk]
+
+
+def _verify_indexed_record(item: _VerifyWorkItem) -> tuple[int, CorpusRecord]:
+    return item.index, _verify_record(item.record, item.source_root)
+
+
+def _verify_work_chunks(
+    records: list[CorpusRecord], source_root: str, chunk_size: int
+) -> list[list[_VerifyWorkItem]]:
+    chunks: list[list[_VerifyWorkItem]] = []
+    chunk: list[_VerifyWorkItem] = []
+    for index, record in enumerate(records):
+        chunk.append(_VerifyWorkItem(index=index, record=record, source_root=source_root))
+        if len(chunk) >= chunk_size:
+            chunks.append(chunk)
+            chunk = []
+    if chunk:
+        chunks.append(chunk)
+    return chunks
+
+
+def _default_verify_chunk_size(record_count: int, workers: int) -> int:
+    if record_count <= 0:
+        return 1
+    return max(1, min(100, record_count // max(1, workers * 8) or 1))
+
+
+def _render_progress_interval(raw_interval: int | None, batch_size: int) -> int:
+    if raw_interval is None:
+        return 0 if batch_size == 1 else 100
+    return max(0, int(raw_interval or 0))
+
+
+def _verify_progress_interval(raw_interval: int | None, workers: int) -> int:
+    if raw_interval is None:
+        return 0 if workers == 1 else 100
+    return max(0, int(raw_interval or 0))
 
 
 def _audit_licenses(args: argparse.Namespace) -> int:

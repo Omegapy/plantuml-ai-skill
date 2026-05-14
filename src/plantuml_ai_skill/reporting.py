@@ -117,6 +117,65 @@ def write_render_failure_triage_report(records: list[CorpusRecord], output_path:
     return path
 
 
+def render_failure_summary_report(records: list[CorpusRecord]) -> str:
+    """Return grouped TSV counts for failed or skipped renders."""
+
+    groups: Counter[tuple[str, str, str, str, str]] = Counter()
+    statuses: dict[tuple[str, str, str, str, str], Counter[str]] = {}
+    for record in records:
+        if record.render_status not in {"failed", "skipped"}:
+            continue
+        failure_class, actionability, recommended_action = classify_render_failure(record)
+        key = (
+            record.license_family,
+            record.source_ref,
+            failure_class,
+            actionability,
+            recommended_action,
+        )
+        groups[key] += 1
+        statuses.setdefault(key, Counter())[record.render_status] += 1
+
+    header = [
+        "count",
+        "license_family",
+        "source_ref",
+        "render_failed",
+        "render_skipped",
+        "failure_class",
+        "actionability",
+        "recommended_action",
+    ]
+    lines = ["\t".join(header)]
+    rows = sorted(groups.items(), key=lambda item: (-item[1], item[0]))
+    for key, count in rows:
+        license_family, source_ref, failure_class, actionability, recommended_action = key
+        status_counts = statuses[key]
+        lines.append(
+            "\t".join(
+                _tsv_cell(value)
+                for value in [
+                    count,
+                    license_family,
+                    source_ref,
+                    status_counts["failed"],
+                    status_counts["skipped"],
+                    failure_class,
+                    actionability,
+                    recommended_action,
+                ]
+            )
+        )
+    return "\n".join(lines) + "\n"
+
+
+def write_render_failure_summary_report(records: list[CorpusRecord], output_path: Path | str) -> Path:
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_failure_summary_report(records), encoding="utf-8")
+    return path
+
+
 def classify_render_failure(record: CorpusRecord) -> tuple[str, str, str]:
     """Classify a render failure without changing corpus eligibility."""
 

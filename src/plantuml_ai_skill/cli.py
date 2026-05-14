@@ -23,8 +23,10 @@ from .recommendation_coverage import check_recommendation_coverage
 from .renderer import PlantUMLRenderer, render_version_label
 from .reporting import (
     render_failure_report,
+    render_failure_summary_report,
     render_failure_triage_report,
     write_render_failure_report,
+    write_render_failure_summary_report,
     write_render_failure_triage_report,
     write_report,
 )
@@ -113,6 +115,13 @@ def build_parser() -> argparse.ArgumentParser:
     failure_triage.add_argument("--manifest", required=True)
     failure_triage.add_argument("--output", default="")
 
+    failure_summary = sub.add_parser(
+        "render-failure-summary",
+        help="group failed and skipped renders by repo, license, class, and actionability as TSV",
+    )
+    failure_summary.add_argument("--manifest", required=True)
+    failure_summary.add_argument("--output", default="")
+
     contact = sub.add_parser("png-contact-sheet", help="write an HTML contact sheet for PNG mismatches")
     contact.add_argument("--manifest", required=True)
     contact.add_argument("--source-root", default="")
@@ -182,6 +191,14 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Wrote render failure triage report: {path}")
             else:
                 print(render_failure_triage_report(records), end="")
+            return 0
+        if args.command == "render-failure-summary":
+            records = read_jsonl(args.manifest)
+            if args.output:
+                path = write_render_failure_summary_report(records, args.output)
+                print(f"Wrote render failure summary report: {path}")
+            else:
+                print(render_failure_summary_report(records), end="")
             return 0
         if args.command == "png-contact-sheet":
             records = _read_curated_records(args.manifest, args.curation)

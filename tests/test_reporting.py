@@ -5,6 +5,7 @@ from plantuml_ai_skill.reporting import (
     classify_render_failure,
     markdown_report,
     render_failure_report,
+    render_failure_summary_report,
     render_failure_triage_report,
 )
 
@@ -174,6 +175,57 @@ class ReportingTests(unittest.TestCase):
         self.assertIn("owner/remote\tremote.puml\tpermissive\tskipped\tunsupported_remote_include", report)
         self.assertIn("potentially_recoverable_with_audited_vendor_includes", report)
         self.assertIn("owner/gpl\tactivity.puml\tcopyleft\tfailed\tactivity_syntax\tblocked_by_license", report)
+
+    def test_render_failure_summary_report_groups_by_license_repo_and_actionability(self) -> None:
+        report = render_failure_summary_report(
+            [
+                record(
+                    source_ref="owner/dot",
+                    puml_path="dot-1.puml",
+                    render_status="failed",
+                    render_fail_reason="This looks like a DOT diagram. Please use @startdot instead of @startuml.",
+                ),
+                record(
+                    source_ref="owner/dot",
+                    puml_path="dot-2.puml",
+                    render_status="failed",
+                    render_fail_reason="This looks like a DOT diagram. Please use @startdot instead of @startuml.",
+                ),
+                record(
+                    source_ref="owner/remote",
+                    puml_path="remote.puml",
+                    render_status="skipped",
+                    render_fail_reason="remote_include_blocked",
+                ),
+                record(
+                    source_ref="owner/gpl",
+                    puml_path="activity.puml",
+                    license_family="copyleft",
+                    render_status="failed",
+                    render_fail_reason="ERROR 72 Cannot find if (Assumed diagram type: activity)",
+                ),
+                record(source_ref="owner/ok", puml_path="ok.puml"),
+            ]
+        )
+
+        self.assertIn(
+            "count\tlicense_family\tsource_ref\trender_failed\trender_skipped\tfailure_class",
+            report,
+        )
+        self.assertIn(
+            "2\tpermissive\towner/dot\t2\t0\tdot_inside_startuml\tnot_recoverable_as_plantuml",
+            report,
+        )
+        self.assertIn(
+            "1\tpermissive\towner/remote\t0\t1\tunsupported_remote_include"
+            "\tpotentially_recoverable_with_audited_vendor_includes",
+            report,
+        )
+        self.assertIn(
+            "1\tcopyleft\towner/gpl\t1\t0\tactivity_syntax\tblocked_by_license",
+            report,
+        )
+        self.assertNotIn("owner/ok", report)
 
     def test_classify_render_failure_marks_local_include_gap(self) -> None:
         self.assertEqual(

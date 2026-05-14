@@ -93,6 +93,61 @@ class LicenseCandidatesCliTests(unittest.TestCase):
         )
         self.assertNotIn("owner/safe", output.getvalue())
 
+    def test_render_failure_summary_cli_groups_failures(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "manifest.jsonl"
+            write_jsonl(
+                [
+                    record(
+                        id="dot-1",
+                        source_ref="owner/dot",
+                        license="MIT",
+                        license_family="permissive",
+                        render_status="failed",
+                        render_fail_reason=(
+                            "This looks like a DOT diagram. Please use @startdot instead of @startuml."
+                        ),
+                    ),
+                    record(
+                        id="dot-2",
+                        source_ref="owner/dot",
+                        license="MIT",
+                        license_family="permissive",
+                        render_status="failed",
+                        render_fail_reason=(
+                            "This looks like a DOT diagram. Please use @startdot instead of @startuml."
+                        ),
+                    ),
+                    record(
+                        id="blocked",
+                        source_ref="owner/gpl",
+                        license="GPL-3.0",
+                        license_family="copyleft",
+                        render_status="failed",
+                        render_fail_reason="ERROR 72 Cannot find if (Assumed diagram type: activity)",
+                    ),
+                    record(
+                        id="ok",
+                        source_ref="owner/ok",
+                        license="MIT",
+                        license_family="permissive",
+                    ),
+                ],
+                manifest,
+            )
+
+            output = StringIO()
+            with redirect_stdout(output):
+                result = main(["render-failure-summary", "--manifest", str(manifest)])
+
+        self.assertEqual(0, result)
+        self.assertIn(
+            "2\tpermissive\towner/dot\t2\t0\tdot_inside_startuml\tnot_recoverable_as_plantuml",
+            output.getvalue(),
+        )
+        self.assertIn("1\tcopyleft\towner/gpl\t1\t0\tactivity_syntax\tblocked_by_license", output.getvalue())
+        self.assertNotIn("owner/ok", output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

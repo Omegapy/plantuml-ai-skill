@@ -23,6 +23,7 @@ DEFAULT_ASSET_DIR = PROJECT_ROOT / "tools" / "plantuml"
 DEFAULT_JAR_PATH = DEFAULT_ASSET_DIR / PLANTUML_JAR_NAME
 DEFAULT_SOURCES_CONFIG = PROJECT_ROOT / "config" / "sources.yml"
 DEFAULT_LICENSE_OVERRIDES_PATH = PROJECT_ROOT / "config" / "license-overrides.yml"
+DEFAULT_LICENSE_BLOCKLIST_PATH = PROJECT_ROOT / "config" / "license-blocklist.yml"
 DEFAULT_SCHEMA_PATH = PROJECT_ROOT / "schemas" / "corpus-record.schema.json"
 
 GENERATED_DIRS = (

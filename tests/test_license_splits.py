@@ -1,9 +1,16 @@
 from pathlib import Path
+import json
 import tempfile
 import unittest
 
 from plantuml_ai_skill.acquisition import acquire_fixtures
-from plantuml_ai_skill.license_policy import license_family, may_enter_training_split, training_block_reason
+from plantuml_ai_skill.license_policy import (
+    blocked_license_review_for_repo,
+    license_family,
+    load_license_blocklist,
+    may_enter_training_split,
+    training_block_reason,
+)
 from plantuml_ai_skill.splits import build_splits, promotion_block_reason
 
 
@@ -23,6 +30,34 @@ class LicenseSplitTests(unittest.TestCase):
         self.assertFalse(may_enter_training_split("GPL-3.0", ["training"]))
         self.assertFalse(may_enter_training_split("MIT", ["gold_eval"]))
         self.assertEqual("blocked_copyleft_license", training_block_reason("GPL-3.0", ["training"]))
+
+    def test_license_blocklist_records_reviewed_non_permissive_repos(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "license-blocklist.yml"
+            path.write_text(
+                json.dumps(
+                    {
+                        "repositories": {
+                            "Owner/Repo": {
+                                "license": "GPL-3.0",
+                                "license_family": "copyleft",
+                                "license_path": "LICENSE",
+                                "notes": "Reviewed upstream license",
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            reviews = load_license_blocklist(path)
+
+        review = blocked_license_review_for_repo("owner/repo", reviews)
+        self.assertIsNotNone(review)
+        assert review is not None
+        self.assertEqual("GPL-3.0", review.license)
+        self.assertEqual("copyleft", review.license_family)
+        self.assertEqual("LICENSE", review.license_path)
+        self.assertEqual("Reviewed upstream license", review.notes)
 
     def test_build_splits_outputs_expected_groups(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

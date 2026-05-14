@@ -159,6 +159,56 @@
       "license": "Apache-2.0",
       "license_path": "LICENSE",
       "notes": "Reviewed upstream repository license file."
+    },
+    "dcs4cop/xcube": {
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "iqss/dataverse": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE.md",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is IQSS/dataverse."
+    },
+    "aelfproject/aelf": {
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is AElfProject/AElf."
+    },
+    "fonttools/fonttools": {
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "indeedeng/proctor": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "flutter/packages": {
+      "license": "BSD-3-Clause",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "rdflib/rdflib": {
+      "license": "BSD-3-Clause",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is RDFLib/rdflib."
+    },
+    "ls1intum/artemis": {
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is ls1intum/Artemis."
+    },
+    "nrel/energyplus": {
+      "license": "BSD-like permissive",
+      "license_path": "LICENSE.txt",
+      "notes": "Reviewed upstream repository license file. GitHub redirects to NatLabRockies/EnergyPlus; custom BSD-style terms include an EnergyPlus name-use clause."
+    },
+    "owtf/owtf": {
+      "license": "BSD-3-Clause",
+      "license_path": "LICENSE.md",
+      "notes": "Reviewed upstream repository license file."
     }
   }
 }

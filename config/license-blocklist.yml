@@ -1,0 +1,154 @@
+{
+  "repositories": {
+    "mudita/muditaos": {
+      "license": "GPL-3.0",
+      "license_family": "copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file in prior pass; leave blocked."
+    },
+    "tribe29/checkmk": {
+      "license": "GPL-2.0",
+      "license_family": "copyleft",
+      "license_path": "COPYING",
+      "notes": "Reviewed upstream repository license file. GitHub redirects to Checkmk/checkmk."
+    },
+    "opm/resinsight": {
+      "license": "GPL-3.0",
+      "license_family": "copyleft",
+      "license_path": "COPYING",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is OPM/ResInsight."
+    },
+    "wazuh/wazuh": {
+      "license": "GPL-2.0 with OpenSSL exception",
+      "license_family": "copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file; GPL terms with OpenSSL exception are not repo-wide permissive."
+    },
+    "bareos/bareos": {
+      "license": "AGPL-3.0",
+      "license_family": "copyleft",
+      "license_path": "LICENSE.txt",
+      "notes": "Reviewed upstream repository license file; Debian-format file declares AGPL-3.0-only for the main tree with mixed file-specific terms."
+    },
+    "teammates/teammates": {
+      "license": "GPL-2.0",
+      "license_family": "copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is TEAMMATES/teammates."
+    },
+    "pycqa/pylint": {
+      "license": "GPL-2.0",
+      "license_family": "copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub redirects to pylint-dev/pylint."
+    },
+    "kaltura/mwembed": {
+      "license": "AGPL-3.0",
+      "license_family": "copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is kaltura/mwEmbed."
+    },
+    "ivmartel/dwv": {
+      "license": "GPL-3.0",
+      "license_family": "copyleft",
+      "license_path": "license.txt",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "elastic/cloud-on-k8s": {
+      "license": "Elastic-2.0",
+      "license_family": "unknown",
+      "license_path": "LICENSE.txt",
+      "notes": "Reviewed upstream repository license file; source-available terms are not repo-wide permissive."
+    },
+    "mlreef/mlreef": {
+      "license": "CC-BY-SA-4.0 docs / MIT mixed",
+      "license_family": "mixed",
+      "license_path": "LICENSE.md",
+      "notes": "Reviewed upstream repository license file. Corpus diagrams are under docs/content, which the root license assigns to CC-BY-SA-4.0."
+    },
+    "fedict/eid-mw": {
+      "license": "LGPL-3.0",
+      "license_family": "weak_copyleft",
+      "license_path": "COPYING",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is Fedict/eid-mw."
+    },
+    "osm-search/nominatim": {
+      "license": "GPL-3.0",
+      "license_family": "copyleft",
+      "license_path": "COPYING",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is osm-search/Nominatim."
+    },
+    "conda/conda": {
+      "license": "BSD-3-Clause with LGPL-3.0 incorporated dependency",
+      "license_family": "mixed",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file; it includes BSD terms plus an incorporated LGPL-3.0 dependency notice, so no repo-wide approval."
+    },
+    "betonquest/betonquest": {
+      "license": "GPL-3.0",
+      "license_family": "copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is BetonQuest/BetonQuest."
+    },
+    "eclipse/xacc": {
+      "license": "EPL-1.0 or EDL-1.0",
+      "license_family": "mixed",
+      "license_path": "NOTICE",
+      "notes": "Reviewed upstream NOTICE and root license files. Project is dual EPL/EDL and NOTICE lists MPL third-party content, so leave blocked."
+    },
+    "geosx/geos": {
+      "license": "LGPL-2.1",
+      "license_family": "weak_copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub redirects to GEOS-DEV/GEOS."
+    },
+    "jmri/jmri": {
+      "license": "GPL-2.0 with classpath exception",
+      "license_family": "copyleft",
+      "license_path": "LICENSE.txt",
+      "notes": "Reviewed upstream repository license file; exception does not make the repo permissive for corpus training."
+    },
+    "mantidproject/mantid": {
+      "license": "GPL-3.0",
+      "license_family": "copyleft",
+      "license_path": "LICENSE.txt",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "nihlus/remora.discord": {
+      "license": "LGPL-3.0",
+      "license_family": "weak_copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file for Remora/Remora.Discord; corpus contains this older source_ref alias."
+    },
+    "remora/remora.discord": {
+      "license": "LGPL-3.0",
+      "license_family": "weak_copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is Remora/Remora.Discord."
+    },
+    "rolisteam/rolisteam": {
+      "license": "GPL-2.0",
+      "license_family": "copyleft",
+      "license_path": "COPYING.txt",
+      "notes": "Reviewed upstream repository license file. GitHub canonical casing is Rolisteam/rolisteam."
+    },
+    "triplea-game/triplea": {
+      "license": "GPL-3.0",
+      "license_family": "copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "worldbrain/memex": {
+      "license": "MIT stated in README only",
+      "license_family": "unknown",
+      "license_path": "README.md",
+      "notes": "Reviewed upstream repository license section and GitHub license API; no root license file was available to support repo-wide approval."
+    },
+    "zim-desktop-wiki/zim-desktop-wiki": {
+      "license": "GPL-2.0",
+      "license_family": "copyleft",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    }
+  }
+}

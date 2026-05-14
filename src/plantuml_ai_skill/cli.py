@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 from pathlib import Path
 import sys
@@ -10,13 +11,13 @@ import sys
 from .acquisition import acquire_source, ensure_generated_dirs, vendor_include_source
 from .assets import init_assets
 from .config import load_sources_config
-from .constants import DEFAULT_JAR_PATH, PROJECT_ROOT
+from .constants import DEFAULT_JAR_PATH, DEFAULT_LICENSE_BLOCKLIST_PATH, PROJECT_ROOT
 from .contact_sheet import write_png_mismatch_contact_sheet
 from .curation import DEFAULT_CURATION_PATH, apply_curation, load_curation_decisions
 from .doctor import run_doctor
 from .extraction import extract_from_tree, extract_plantuml_blocks
 from .includes import inline_resolved_includes, resolve_include_deps, unresolved_resolution_reason
-from .license_policy import training_block_reason
+from .license_policy import blocked_license_review_for_repo, load_license_blocklist, training_block_reason
 from .manifest import CorpusRecord, read_jsonl, write_jsonl
 from .recommendation_coverage import check_recommendation_coverage
 from .renderer import PlantUMLRenderer, render_version_label
@@ -81,6 +82,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     audit = sub.add_parser("audit-licenses", help="summarize license families in a manifest")
     audit.add_argument("--manifest", required=True)
+
+    candidates = sub.add_parser(
+        "license-candidates",
+        help="rank unknown-license repositories and annotate reviewed blocks",
+    )
+    candidates.add_argument("--manifest", required=True)
+    candidates.add_argument("--blocklist", default=str(DEFAULT_LICENSE_BLOCKLIST_PATH))
+    candidates.add_argument("--limit", type=int, default=40)
 
     splits = sub.add_parser("build-splits", help="build deterministic train/eval split manifests")
     splits.add_argument("--manifest", required=True)
@@ -149,6 +158,8 @@ def main(argv: list[str] | None = None) -> int:
             return _verify(args)
         if args.command == "audit-licenses":
             return _audit_licenses(args)
+        if args.command == "license-candidates":
+            return _license_candidates(args)
         if args.command == "build-splits":
             return _build_splits(args)
         if args.command == "report":
@@ -355,6 +366,57 @@ def _audit_licenses(args: argparse.Namespace) -> int:
     return 0
 
 
+def _license_candidates(args: argparse.Namespace) -> int:
+    records = read_jsonl(args.manifest)
+    blocklist = load_license_blocklist(args.blocklist)
+    grouped: dict[str, Counter[str]] = {}
+    for record in records:
+        if record.license_family != "unknown":
+            continue
+        repo = record.source_ref
+        stats = grouped.setdefault(repo, Counter())
+        stats["count"] += 1
+        stats[f"render_{record.render_status or 'unknown'}"] += 1
+
+    rows = sorted(grouped.items(), key=lambda item: (-item[1]["count"], item[0]))
+    if args.limit > 0:
+        rows = rows[: args.limit]
+
+    header = [
+        "count",
+        "source_ref",
+        "render_ok",
+        "render_failed",
+        "render_skipped",
+        "blocked_review",
+        "license",
+        "license_family",
+        "license_path",
+        "notes",
+    ]
+    print("\t".join(header))
+    for repo, stats in rows:
+        review = blocked_license_review_for_repo(repo, blocklist)
+        print(
+            "\t".join(
+                _tsv_cell(value)
+                for value in [
+                    stats["count"],
+                    repo,
+                    stats["render_ok"],
+                    stats["render_failed"],
+                    stats["render_skipped"],
+                    "yes" if review else "no",
+                    review.license if review else "",
+                    review.license_family if review else "",
+                    review.license_path if review else "",
+                    review.notes if review else "",
+                ]
+            )
+        )
+    return 0
+
+
 def _build_splits(args: argparse.Namespace) -> int:
     records = _read_curated_records(args.manifest, args.curation)
     splits = build_splits(records, args.output_dir, synthetic_cap=args.synthetic_cap)
@@ -427,6 +489,10 @@ def _puml_text_for_record(record: CorpusRecord, puml_path: Path) -> str:
 
 def _dimensions_label(dimensions: tuple[int, int]) -> str:
     return f"{dimensions[0]}x{dimensions[1]}"
+
+
+def _tsv_cell(value: object) -> str:
+    return str(value).replace("\t", " ").replace("\r", " ").replace("\n", " ")
 
 
 def _include_roots(extra_roots: list[str]) -> list[Path]:

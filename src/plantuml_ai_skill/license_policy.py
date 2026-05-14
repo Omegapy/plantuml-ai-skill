@@ -10,6 +10,7 @@ from typing import Any
 
 from .constants import (
     COPYLEFT_LICENSES,
+    DEFAULT_LICENSE_BLOCKLIST_PATH,
     DEFAULT_LICENSE_OVERRIDES_PATH,
     PERMISSIVE_LICENSES,
     WEAK_COPYLEFT_LICENSES,
@@ -23,6 +24,17 @@ class LicenseOverride:
     license: str
     license_path: str = ""
     notes: str = ""
+
+
+@dataclass(frozen=True)
+class BlockedLicenseReview:
+    """A reviewed repository-level license decision that is not training-safe."""
+
+    license: str
+    license_family: str
+    license_path: str = ""
+    notes: str = ""
+    reviewed_at: str = ""
 
 
 def normalize_license(value: str) -> str:
@@ -101,6 +113,38 @@ def license_override_for_repo(
     return overrides.get(normalize_repo_name(repo_name))
 
 
+def load_license_blocklist(
+    path: Path | str = DEFAULT_LICENSE_BLOCKLIST_PATH,
+) -> dict[str, BlockedLicenseReview]:
+    """Load reviewed repositories intentionally left blocked.
+
+    The blocklist is reporting-only: it records direct upstream license reviews
+    that were not safe for repo-wide training approval.
+    """
+
+    blocklist_path = Path(path)
+    if not blocklist_path.exists():
+        return {}
+    payload = json.loads(blocklist_path.read_text(encoding="utf-8"))
+    repositories = payload.get("repositories", {})
+    if not isinstance(repositories, dict):
+        raise ValueError(f"{blocklist_path}: repositories must be an object")
+    reviews: dict[str, BlockedLicenseReview] = {}
+    for repo_name, value in repositories.items():
+        if not isinstance(value, dict):
+            raise ValueError(f"{blocklist_path}: blocklist entry for {repo_name!r} must be an object")
+        normalized_repo = normalize_repo_name(str(repo_name))
+        reviews[normalized_repo] = _blocked_license_review_from_mapping(value, blocklist_path, repo_name)
+    return reviews
+
+
+def blocked_license_review_for_repo(
+    repo_name: str,
+    reviews: dict[str, BlockedLicenseReview],
+) -> BlockedLicenseReview | None:
+    return reviews.get(normalize_repo_name(repo_name))
+
+
 def normalize_repo_name(value: str) -> str:
     return value.strip().lower()
 
@@ -117,4 +161,24 @@ def _license_override_from_mapping(
         license=license_text,
         license_path=str(data.get("license_path", "")),
         notes=str(data.get("notes", "")),
+    )
+
+
+def _blocked_license_review_from_mapping(
+    data: dict[str, Any],
+    path: Path,
+    repo_name: object,
+) -> BlockedLicenseReview:
+    license_text = str(data.get("license", "")).strip()
+    family = str(data.get("license_family", "")).strip()
+    if not license_text:
+        raise ValueError(f"{path}: blocklist entry for {repo_name!r} is missing license")
+    if not family:
+        raise ValueError(f"{path}: blocklist entry for {repo_name!r} is missing license_family")
+    return BlockedLicenseReview(
+        license=license_text,
+        license_family=family,
+        license_path=str(data.get("license_path", "")),
+        notes=str(data.get("notes", "")),
+        reviewed_at=str(data.get("reviewed_at", "")),
     )

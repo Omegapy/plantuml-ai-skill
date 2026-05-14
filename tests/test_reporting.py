@@ -1,7 +1,12 @@
 import unittest
 
 from plantuml_ai_skill.manifest import CorpusRecord
-from plantuml_ai_skill.reporting import markdown_report, render_failure_report
+from plantuml_ai_skill.reporting import (
+    classify_render_failure,
+    markdown_report,
+    render_failure_report,
+    render_failure_triage_report,
+)
 
 
 def record(**overrides: object) -> CorpusRecord:
@@ -134,6 +139,56 @@ class ReportingTests(unittest.TestCase):
         self.assertIn("owner/failed\tfailed.puml\tfailed\tSyntax Error? Some detail", report)
         self.assertIn("owner/skipped\tskipped.puml\tskipped\tremote_include_blocked", report)
         self.assertNotIn("owner/ok", report)
+
+    def test_render_failure_triage_report_classifies_conservatively(self) -> None:
+        report = render_failure_triage_report(
+            [
+                record(
+                    source_ref="owner/dot",
+                    puml_path="dot.puml",
+                    render_status="failed",
+                    render_fail_reason="This looks like a DOT diagram. Please use @startdot instead of @startuml.",
+                ),
+                record(
+                    source_ref="owner/remote",
+                    puml_path="remote.puml",
+                    render_status="skipped",
+                    render_fail_reason="remote_include_blocked",
+                ),
+                record(
+                    source_ref="owner/gpl",
+                    puml_path="activity.puml",
+                    license_family="copyleft",
+                    render_status="failed",
+                    render_fail_reason="ERROR 72 Cannot find if (Assumed diagram type: activity)",
+                ),
+            ]
+        )
+
+        self.assertIn(
+            "source_ref\tpuml_path\tlicense_family\trender_status\tfailure_class\tactionability",
+            report,
+        )
+        self.assertIn("owner/dot\tdot.puml\tpermissive\tfailed\tdot_inside_startuml", report)
+        self.assertIn("not_recoverable_as_plantuml", report)
+        self.assertIn("owner/remote\tremote.puml\tpermissive\tskipped\tunsupported_remote_include", report)
+        self.assertIn("potentially_recoverable_with_audited_vendor_includes", report)
+        self.assertIn("owner/gpl\tactivity.puml\tcopyleft\tfailed\tactivity_syntax\tblocked_by_license", report)
+
+    def test_classify_render_failure_marks_local_include_gap(self) -> None:
+        self.assertEqual(
+            (
+                "missing_local_include",
+                "potentially_recoverable_with_local_include_root",
+                "add an auditable local include root only if the dependency is already acquired",
+            ),
+            classify_render_failure(
+                record(
+                    render_status="skipped",
+                    render_fail_reason="include_resolution_required",
+                )
+            ),
+        )
 
 
 if __name__ == "__main__":

@@ -75,6 +75,89 @@ def write_render_failure_report(records: list[CorpusRecord], output_path: Path |
     return path
 
 
+def render_failure_triage_report(records: list[CorpusRecord]) -> str:
+    """Return a conservative TSV triage report for failed or skipped renders."""
+
+    header = [
+        "source_ref",
+        "puml_path",
+        "license_family",
+        "render_status",
+        "failure_class",
+        "actionability",
+        "recommended_action",
+        "render_fail_reason",
+    ]
+    rows = []
+    for record in records:
+        if record.render_status not in {"failed", "skipped"}:
+            continue
+        failure_class, actionability, recommended_action = classify_render_failure(record)
+        rows.append(
+            [
+                record.source_ref,
+                record.puml_path,
+                record.license_family,
+                record.render_status,
+                failure_class,
+                actionability,
+                recommended_action,
+                _normalized_reason(record.render_fail_reason),
+            ]
+        )
+    lines = ["\t".join(header)]
+    lines.extend("\t".join(_tsv_cell(value) for value in row) for row in rows)
+    return "\n".join(lines) + "\n"
+
+
+def write_render_failure_triage_report(records: list[CorpusRecord], output_path: Path | str) -> Path:
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_failure_triage_report(records), encoding="utf-8")
+    return path
+
+
+def classify_render_failure(record: CorpusRecord) -> tuple[str, str, str]:
+    """Classify a render failure without changing corpus eligibility."""
+
+    failure_class = _failure_class(record)
+    if record.license_family != "permissive":
+        return (
+            failure_class,
+            "blocked_by_license",
+            "leave excluded unless the upstream license is directly reviewed as permissive",
+        )
+    if failure_class == "dot_inside_startuml":
+        return (
+            failure_class,
+            "not_recoverable_as_plantuml",
+            "leave failed or mark invalid upstream; do not rewrite DOT into train",
+        )
+    if failure_class == "unsupported_remote_include":
+        return (
+            failure_class,
+            "potentially_recoverable_with_audited_vendor_includes",
+            "vendor exact remote dependencies only after license review; do not fetch dynamically",
+        )
+    if failure_class == "missing_local_include":
+        return (
+            failure_class,
+            "potentially_recoverable_with_local_include_root",
+            "add an auditable local include root only if the dependency is already acquired",
+        )
+    if failure_class == "empty_diagram":
+        return (
+            failure_class,
+            "not_recoverable_empty_upstream",
+            "leave excluded as an empty upstream diagram",
+        )
+    return (
+        failure_class,
+        "needs_manual_syntax_review",
+        "leave failed unless upstream syntax renders under the pinned renderer without repair",
+    )
+
+
 def _diagnostics_section(records: list[CorpusRecord]) -> list[str]:
     groups: list[tuple[str, str, str, list[tuple[CorpusRecord, str]]]] = [
         (
@@ -232,6 +315,35 @@ def _diagnostic_detail(record: CorpusRecord, detail: str) -> str:
     parts = [clean_detail] if clean_detail else []
     parts.extend(_curation_parts(record))
     return "; ".join(parts)
+
+
+def _failure_class(record: CorpusRecord) -> str:
+    reason = _normalized_reason(record.render_fail_reason).lower()
+    if "remote_include_blocked" in reason:
+        return "unsupported_remote_include"
+    if "include_resolution_required" in reason or "include_roots_not_configured" in reason:
+        return "missing_local_include"
+    if "this looks like a dot diagram" in reason or "use @startdot" in reason:
+        return "dot_inside_startuml"
+    if "empty description" in reason:
+        return "empty_diagram"
+    if "cannot find group" in reason or "cannot find if" in reason or "(assumed diagram type: activity)" in reason:
+        return "activity_syntax"
+    if "map definition should contains key" in reason:
+        return "map_syntax"
+    if "(assumed diagram type: state)" in reason:
+        return "state_syntax"
+    if "(assumed diagram type: class)" in reason:
+        return "class_syntax"
+    if "syntax error" in reason and record.uses_include:
+        return "include_macro_or_syntax"
+    if "syntax error" in reason:
+        return "syntax_error"
+    return "unknown_renderer_failure"
+
+
+def _normalized_reason(reason: str) -> str:
+    return " ".join(reason.split())
 
 
 def _curation_parts(record: CorpusRecord) -> list[str]:

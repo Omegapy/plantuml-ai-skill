@@ -20,7 +20,13 @@ from .license_policy import training_block_reason
 from .manifest import CorpusRecord, read_jsonl, write_jsonl
 from .recommendation_coverage import check_recommendation_coverage
 from .renderer import PlantUMLRenderer, render_version_label
-from .reporting import render_failure_report, write_render_failure_report, write_report
+from .reporting import (
+    render_failure_report,
+    render_failure_triage_report,
+    write_render_failure_report,
+    write_render_failure_triage_report,
+    write_report,
+)
 from .splits import build_splits
 from .verify import png_average_hash, png_dimensions, png_hash_distance, png_perceptual_match, svg_hash, svg_matches
 from .improvement.cli import add_improve_parser, dispatch as dispatch_improve
@@ -91,6 +97,13 @@ def build_parser() -> argparse.ArgumentParser:
     failures.add_argument("--manifest", required=True)
     failures.add_argument("--output", default="")
 
+    failure_triage = sub.add_parser(
+        "render-failure-triage",
+        help="classify failed and skipped render records as TSV",
+    )
+    failure_triage.add_argument("--manifest", required=True)
+    failure_triage.add_argument("--output", default="")
+
     contact = sub.add_parser("png-contact-sheet", help="write an HTML contact sheet for PNG mismatches")
     contact.add_argument("--manifest", required=True)
     contact.add_argument("--source-root", default="")
@@ -150,6 +163,14 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Wrote render failure report: {path}")
             else:
                 print(render_failure_report(records), end="")
+            return 0
+        if args.command == "render-failure-triage":
+            records = read_jsonl(args.manifest)
+            if args.output:
+                path = write_render_failure_triage_report(records, args.output)
+                print(f"Wrote render failure triage report: {path}")
+            else:
+                print(render_failure_triage_report(records), end="")
             return 0
         if args.command == "png-contact-sheet":
             records = _read_curated_records(args.manifest, args.curation)

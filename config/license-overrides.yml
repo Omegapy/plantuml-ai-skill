@@ -1,3 +1,164 @@
 {
-  "repositories": {}
+  "repositories": {
+    "iluwatar/java-design-patterns": {
+      "license": "MIT",
+      "license_path": "LICENSE.md",
+      "notes": "Reviewed upstream repository license file. LICENSE.md notes the model-view-viewmodel module uses the LGPL-licensed ZK framework."
+    },
+    "hyperledger/indy-sdk": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub redirects hyperledger/indy-sdk to hyperledger-indy/indy-sdk."
+    },
+    "cs-si/orekit": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE.txt",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "eugenp/tutorials": {
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "kubernetes-sigs/cluster-api": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "adorsys/xs2a": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "hyperledger/aries-rfcs": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "eclipse-iceoryx/iceoryx": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "alphagov/whitehall": {
+      "license": "MIT",
+      "license_path": "LICENCE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "arm-software/arm-trusted-firmware": {
+      "license": "BSD-3-Clause",
+      "license_path": "docs/license.rst",
+      "notes": "Reviewed upstream docs/license.rst via the root license.rst pointer; project is provided under BSD-3-Clause and documents permissive handling for listed third-party code."
+    },
+    "hyperledger/cacti": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. GitHub redirects hyperledger/cacti to hyperledger-cacti/cacti."
+    },
+    "hyperledger/indy-plenum": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "bmwcarit/joynr": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "4minitz/4minitz": {
+      "license": "MIT",
+      "license_path": "LICENSE.md",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "opendatacube/datacube-core": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "awslabs/djl": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. Project also appears as deepjavalibrary/djl in the corpus."
+    },
+    "deepjavalibrary/djl": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. Project also appears as awslabs/djl in the corpus."
+    },
+    "hipparchus-math/hipparchus": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE.txt",
+      "notes": "Reviewed upstream repository license file. LICENSE.txt includes third-party permissive notices and a netlib-derived BesselJ caveat with no original license statement."
+    },
+    "ogrecave/ogre": {
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "apache/commons-math": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. LICENSE includes third-party permissive notices and a netlib-derived BesselJ caveat with no original license statement."
+    },
+    "apache/trafficserver": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file. LICENSE includes third-party permissive and OpenSSL/SSLeay notices."
+    },
+    "azure/azure-iot-sdk-csharp": {
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "cosmos/cosmos-sdk": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "gradle/gradle": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "jenkinsci/warnings-ng-plugin": {
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "github/linguist": {
+      "license": "MIT",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file at github-linguist/linguist; GitHub redirects from github/linguist."
+    },
+    "nasa/fprime": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE.txt",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "kubernetes/enhancements": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "tng/archunit": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    },
+    "ripple/rippled": {
+      "license": "ISC",
+      "license_path": "LICENSE.md",
+      "notes": "Reviewed upstream repository license file. Same license text is present in xrplf/rippled."
+    },
+    "xrplf/rippled": {
+      "license": "ISC",
+      "license_path": "LICENSE.md",
+      "notes": "Reviewed upstream repository license file. Same license text is present in ripple/rippled."
+    },
+    "hyperledger/indy-node": {
+      "license": "Apache-2.0",
+      "license_path": "LICENSE",
+      "notes": "Reviewed upstream repository license file."
+    }
+  }
 }

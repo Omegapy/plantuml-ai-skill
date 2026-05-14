@@ -50,6 +50,31 @@ def write_report(
     return path
 
 
+def render_failure_report(records: list[CorpusRecord]) -> str:
+    """Return a compact TSV report for failed or skipped renders."""
+
+    rows = [
+        [
+            record.source_ref,
+            record.puml_path,
+            record.render_status,
+            " ".join(record.render_fail_reason.split()),
+        ]
+        for record in records
+        if record.render_status in {"failed", "skipped"}
+    ]
+    lines = ["source_ref\tpuml_path\trender_status\trender_fail_reason"]
+    lines.extend("\t".join(_tsv_cell(value) for value in row) for row in rows)
+    return "\n".join(lines) + "\n"
+
+
+def write_render_failure_report(records: list[CorpusRecord], output_path: Path | str) -> Path:
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_failure_report(records), encoding="utf-8")
+    return path
+
+
 def _diagnostics_section(records: list[CorpusRecord]) -> list[str]:
     groups: list[tuple[str, str, str, list[tuple[CorpusRecord, str]]]] = [
         (
@@ -239,3 +264,7 @@ def _escape_table_cell(value: str) -> str:
     if len(clean) > 160:
         clean = clean[:157] + "..."
     return clean.replace("|", "\\|")
+
+
+def _tsv_cell(value: str) -> str:
+    return " ".join(str(value).split()).replace("\t", " ")

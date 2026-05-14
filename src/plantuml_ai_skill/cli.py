@@ -20,7 +20,7 @@ from .license_policy import training_block_reason
 from .manifest import CorpusRecord, read_jsonl, write_jsonl
 from .recommendation_coverage import check_recommendation_coverage
 from .renderer import PlantUMLRenderer, render_version_label
-from .reporting import write_report
+from .reporting import render_failure_report, write_render_failure_report, write_report
 from .splits import build_splits
 from .verify import png_average_hash, png_dimensions, png_hash_distance, png_perceptual_match, svg_hash, svg_matches
 from .improvement.cli import add_improve_parser, dispatch as dispatch_improve
@@ -87,6 +87,10 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--output", default=str(PROJECT_ROOT / "data" / "reports" / "corpus-report.md"))
     report.add_argument("--curation", default=str(DEFAULT_CURATION_PATH))
 
+    failures = sub.add_parser("render-failures", help="list failed and skipped render records as TSV")
+    failures.add_argument("--manifest", required=True)
+    failures.add_argument("--output", default="")
+
     contact = sub.add_parser("png-contact-sheet", help="write an HTML contact sheet for PNG mismatches")
     contact.add_argument("--manifest", required=True)
     contact.add_argument("--source-root", default="")
@@ -138,6 +142,14 @@ def main(argv: list[str] | None = None) -> int:
             records = _read_curated_records(args.manifest, args.curation)
             path = write_report(records, args.output)
             print(f"Wrote report: {path}")
+            return 0
+        if args.command == "render-failures":
+            records = read_jsonl(args.manifest)
+            if args.output:
+                path = write_render_failure_report(records, args.output)
+                print(f"Wrote render failure report: {path}")
+            else:
+                print(render_failure_report(records), end="")
             return 0
         if args.command == "png-contact-sheet":
             records = _read_curated_records(args.manifest, args.curation)

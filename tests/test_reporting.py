@@ -1,7 +1,7 @@
 import unittest
 
 from plantuml_ai_skill.manifest import CorpusRecord
-from plantuml_ai_skill.reporting import markdown_report
+from plantuml_ai_skill.reporting import markdown_report, render_failure_report
 
 
 def record(**overrides: object) -> CorpusRecord:
@@ -110,6 +110,30 @@ class ReportingTests(unittest.TestCase):
         self.assertIn("`expected.puml`", report)
         self.assertIn("`model.py`", report)
         self.assertIn("high", report)
+
+    def test_render_failure_report_lists_failed_and_skipped_records(self) -> None:
+        report = render_failure_report(
+            [
+                record(
+                    source_ref="owner/failed",
+                    puml_path="failed.puml",
+                    render_status="failed",
+                    render_fail_reason="Syntax Error?\nSome detail",
+                ),
+                record(
+                    source_ref="owner/skipped",
+                    puml_path="skipped.puml",
+                    render_status="skipped",
+                    render_fail_reason="remote_include_blocked",
+                ),
+                record(source_ref="owner/ok", puml_path="ok.puml"),
+            ]
+        )
+
+        self.assertIn("source_ref\tpuml_path\trender_status\trender_fail_reason", report)
+        self.assertIn("owner/failed\tfailed.puml\tfailed\tSyntax Error? Some detail", report)
+        self.assertIn("owner/skipped\tskipped.puml\tskipped\tremote_include_blocked", report)
+        self.assertNotIn("owner/ok", report)
 
 
 if __name__ == "__main__":

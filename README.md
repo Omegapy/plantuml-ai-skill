@@ -6,6 +6,18 @@ An AI skill project for generating, validating, rendering, and verifying PlantUM
 
 This project provides a Python-based workflow that helps agents turn plain-language diagram requests into inspectable PlantUML source, validate that source, render diagrams for review, and assemble verified training/evaluation corpora from public PlantUML sources.
 
+## Repository Map
+
+The main folder guides are:
+
+- `.agents/README.md` for tracked Codex skill sources.
+- `config/README.md` for source, license, and curation configuration.
+- `data/README.md` for ignored local/generated workspace policy.
+- `docs/README.md` for implementation notes, release docs, and historical reviews.
+- `schemas/README.md` for persisted JSON contracts.
+- `tests/README.md` for fixture policy and focused test commands.
+- `tools/README.md` for ignored local renderer/tool assets.
+
 ## For Users: Download a Package
 
 If you only want to install the PlantUML Diagram skill into your own Codex project on macOS, Linux, or Windows 11, use the GitHub release packages instead of this developer setup.

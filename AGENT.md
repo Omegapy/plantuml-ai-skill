@@ -1,14 +1,10 @@
-# Agent Guidance
+# Agent Guidance Compatibility Stub
 
-This repository is for a Python AI skill that generates, validates, and renders PlantUML diagrams from natural-language prompts.
+`AGENTS.md` is the canonical agent guidance file for this repository.
 
-## Working Rules
+This file remains only as a compatibility pointer for tools or workflows that
+look for the singular `AGENT.md` name. Use these entry points instead:
 
-- Use Python and the repo-local virtual environment at `.venv/`.
-- Keep generated PlantUML source inspectable before rendering.
-- Validate PlantUML code before rendering diagrams.
-- Use the pinned Java PlantUML jar as the primary renderer.
-- Keep Graphviz available and verified with `java -jar plantuml.jar -testdot`.
-- Keep corpus records manifest-first and preserve row-level source/license provenance.
-- Avoid committing secrets, local caches, virtual environments, or throwaway rendered artifacts unless they are intentionally part of the repository.
-- Keep changes focused on the requested skill behavior and follow the existing project structure as it grows.
+- `AGENTS.md` for agent operating rules, setup, tests, and smoke workflows.
+- `README.md` for the human-facing project overview, package installation
+  guide, development setup, data policy, and test commands.

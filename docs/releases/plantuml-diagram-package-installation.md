@@ -19,17 +19,17 @@ Codex reads the installed files from the hidden `.agents` folder in your project
 Open the GitHub release page:
 
 ```text
-https://github.com/Omegapy/plantuml-ai-skill/releases/tag/v0.1.0
+https://github.com/Omegapy/plantuml-ai-skill/releases/tag/v0.1.1
 ```
 
 Download exactly one package for your operating system and use case.
 
 | Use case | macOS or Linux download | Windows 11 download |
 | --- | --- | --- |
-| Skill instructions only | `plantuml-diagram-core-0.1.0.tar.gz` | `plantuml-diagram-core-0.1.0-windows.zip` |
-| Skill plus PlantUML text checker | `plantuml-diagram-validate-0.1.0.tar.gz` | `plantuml-diagram-validate-0.1.0-windows.zip` |
-| Checker plus SVG/PNG rendering | `plantuml-diagram-render-0.1.0.tar.gz` | `plantuml-diagram-render-0.1.0-windows.zip` |
-| Rendering plus C4-PlantUML includes | `plantuml-diagram-c4-0.1.0.tar.gz` | `plantuml-diagram-c4-0.1.0-windows.zip` |
+| Skill instructions only | `plantuml-diagram-core-0.1.1.tar.gz` | `plantuml-diagram-core-0.1.1-windows.zip` |
+| Skill plus PlantUML text checker | `plantuml-diagram-validate-0.1.1.tar.gz` | `plantuml-diagram-validate-0.1.1-windows.zip` |
+| Checker plus SVG/PNG rendering | `plantuml-diagram-render-0.1.1.tar.gz` | `plantuml-diagram-render-0.1.1-windows.zip` |
+| Rendering plus C4-PlantUML includes | `plantuml-diagram-c4-0.1.1.tar.gz` | `plantuml-diagram-c4-0.1.1-windows.zip` |
 | Optional safety check file | `SHA256SUMS` | `SHA256SUMS` |
 
 Recommendation: if you are unsure, choose the `render` package for your operating system. Choose the `c4` package only if you know you need C4 diagrams.
@@ -41,13 +41,13 @@ Each download file opens into its own installer folder.
 Example on macOS or Linux:
 
 ```text
-plantuml-diagram-render-0.1.0.tar.gz
+plantuml-diagram-render-0.1.1.tar.gz
 ```
 
 extracts into:
 
 ```text
-plantuml-diagram-render-0.1.0/
+plantuml-diagram-render-0.1.1/
   README.md
   install.sh
   manifest.json
@@ -57,13 +57,13 @@ plantuml-diagram-render-0.1.0/
 Example on Windows 11:
 
 ```text
-plantuml-diagram-render-0.1.0-windows.zip
+plantuml-diagram-render-0.1.1-windows.zip
 ```
 
 extracts into:
 
 ```text
-plantuml-diagram-render-0.1.0-windows/
+plantuml-diagram-render-0.1.1-windows/
   README.md
   install.ps1
   install.cmd
@@ -91,7 +91,7 @@ cd /path/to/your-project
 5. Run the package installer. Replace the folder name if you chose a different package:
 
 ```bash
-bash /path/to/plantuml-diagram-render-0.1.0/install.sh
+bash /path/to/plantuml-diagram-render-0.1.1/install.sh
 ```
 
 The installer copies the useful files into your project's hidden `.agents` folder.
@@ -112,13 +112,13 @@ Set-Location C:\path\to\your-project
 5. Run the package installer. Replace the folder name if you chose a different package:
 
 ```powershell
-.\plantuml-diagram-render-0.1.0-windows\install.cmd
+.\plantuml-diagram-render-0.1.1-windows\install.cmd
 ```
 
 You can also run the PowerShell installer directly:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\path\to\plantuml-diagram-render-0.1.0-windows\install.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\path\to\plantuml-diagram-render-0.1.1-windows\install.ps1
 ```
 
 The installer copies the useful files into your project's hidden `.agents` folder.
@@ -243,26 +243,26 @@ Then initialize and check the renderer:
 Example for the render package on macOS:
 
 ```bash
-curl -L -O https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.0/SHA256SUMS
-curl -L -O https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.0/plantuml-diagram-render-0.1.0.tar.gz
-grep ' plantuml-diagram-render-0.1.0.tar.gz$' SHA256SUMS | shasum -a 256 -c -
+curl -L -O https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.1/SHA256SUMS
+curl -L -O https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.1/plantuml-diagram-render-0.1.1.tar.gz
+grep ' plantuml-diagram-render-0.1.1.tar.gz$' SHA256SUMS | shasum -a 256 -c -
 ```
 
 Example for the render package on Linux:
 
 ```bash
-curl -L -O https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.0/SHA256SUMS
-curl -L -O https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.0/plantuml-diagram-render-0.1.0.tar.gz
-grep ' plantuml-diagram-render-0.1.0.tar.gz$' SHA256SUMS | sha256sum -c -
+curl -L -O https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.1/SHA256SUMS
+curl -L -O https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.1/plantuml-diagram-render-0.1.1.tar.gz
+grep ' plantuml-diagram-render-0.1.1.tar.gz$' SHA256SUMS | sha256sum -c -
 ```
 
 Example for the render package on Windows 11:
 
 ```powershell
-Invoke-WebRequest https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.0/SHA256SUMS -OutFile SHA256SUMS
-Invoke-WebRequest https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.0/plantuml-diagram-render-0.1.0-windows.zip -OutFile plantuml-diagram-render-0.1.0-windows.zip
-$expected = (Select-String -Path SHA256SUMS -Pattern ' plantuml-diagram-render-0.1.0-windows.zip$').Line.Split()[0].ToUpperInvariant()
-$actual = (Get-FileHash -Algorithm SHA256 .\plantuml-diagram-render-0.1.0-windows.zip).Hash
+Invoke-WebRequest https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.1/SHA256SUMS -OutFile SHA256SUMS
+Invoke-WebRequest https://github.com/Omegapy/plantuml-ai-skill/releases/download/v0.1.1/plantuml-diagram-render-0.1.1-windows.zip -OutFile plantuml-diagram-render-0.1.1-windows.zip
+$expected = (Select-String -Path SHA256SUMS -Pattern ' plantuml-diagram-render-0.1.1-windows.zip$').Line.Split()[0].ToUpperInvariant()
+$actual = (Get-FileHash -Algorithm SHA256 .\plantuml-diagram-render-0.1.1-windows.zip).Hash
 if ($expected -ne $actual) { throw "Checksum mismatch" }
 ```
 

@@ -40,6 +40,16 @@ class ReleasePackageTests(unittest.TestCase):
             validate_members = _tar_members(Path(left) / "plantuml-diagram-validate-test.tar.gz")
             render_members = _tar_members(Path(left) / "plantuml-diagram-render-test.tar.gz")
             c4_members = _tar_members(Path(left) / "plantuml-diagram-c4-test.tar.gz")
+            members_by_archive = {
+                "plantuml-diagram-core-test.tar.gz": core_members,
+                "plantuml-diagram-validate-test.tar.gz": validate_members,
+                "plantuml-diagram-render-test.tar.gz": render_members,
+                "plantuml-diagram-c4-test.tar.gz": c4_members,
+            }
+            readmes = {
+                name: _tar_text(Path(left) / name, f"{name.removesuffix('.tar.gz')}/README.md")
+                for name in members_by_archive
+            }
 
         self.assertIn("plantuml-diagram-core-test/payload/skills/plantuml-diagram/SKILL.md", core_members)
         self.assertFalse(any("/scripts/" in member for member in core_members))
@@ -57,6 +67,23 @@ class ReleasePackageTests(unittest.TestCase):
         for members in (core_members, validate_members, render_members, c4_members):
             self.assertFalse(any("/payload/data/" in member for member in members))
             self.assertFalse(any(member.endswith(".jar") for member in members))
+        for archive_name, members in members_by_archive.items():
+            package_root = archive_name.removesuffix(".tar.gz")
+            self.assertIn(f"{package_root}/README.md", members)
+            self.assertIn(f"{package_root}/install.sh", members)
+            self.assertIn(f"{package_root}/manifest.json", members)
+            self.assertIn(f"{package_root}/payload", members)
+            self.assertIn("unzipped installer folder", readmes[archive_name])
+            self.assertIn("hidden `.agents` folder", readmes[archive_name])
+            self.assertIn("for Codex and the Codex app", readmes[archive_name])
+            self.assertIn("not a Claude Code package", readmes[archive_name])
+        for archive_name in ("plantuml-diagram-render-test.tar.gz", "plantuml-diagram-c4-test.tar.gz"):
+            self.assertIn("macOS And Linux Requirements For Rendering", readmes[archive_name])
+            self.assertIn("Python 3.11 or newer", readmes[archive_name])
+            self.assertIn("Java 11 or newer", readmes[archive_name])
+            self.assertIn("Graphviz", readmes[archive_name])
+            self.assertIn("sudo apt install python3 openjdk-17-jre graphviz curl", readmes[archive_name])
+        self.assertIn("bundled C4 diagram support", readmes["plantuml-diagram-c4-test.tar.gz"])
 
     def test_core_installer_is_idempotent_and_protects_existing_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -264,6 +291,13 @@ def _install(package_dir: Path, project: Path, *args: str) -> subprocess.Complet
 def _tar_members(archive: Path) -> list[str]:
     with tarfile.open(archive, "r:gz") as tar:
         return sorted(tar.getnames())
+
+
+def _tar_text(archive: Path, member: str) -> str:
+    with tarfile.open(archive, "r:gz") as tar:
+        extracted = tar.extractfile(member)
+        assert extracted is not None
+        return extracted.read().decode("utf-8")
 
 
 def _fake_renderer(root: Path) -> tuple[Path, Path]:

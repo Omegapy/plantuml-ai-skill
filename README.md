@@ -6,6 +6,15 @@ An AI skill project for generating, validating, rendering, and verifying PlantUM
 
 This project provides a Python-based workflow that helps agents turn plain-language diagram requests into inspectable PlantUML source, validate that source, render diagrams for review, and assemble verified training/evaluation corpora from public PlantUML sources.
 
+## For Users: Download a Package
+
+If you only want to install the PlantUML Diagram skill into your own Codex project on macOS or Linux, use the GitHub release packages instead of this developer setup.
+
+- Download one package from the [v0.1.0 release](https://github.com/Omegapy/plantuml-ai-skill/releases/tag/v0.1.0).
+- Read the beginner guide: [PlantUML Diagram Package Installation Guide](docs/releases/plantuml-diagram-package-installation.md).
+- The package unzips into its own installer folder, and `install.sh` copies the files into your project's hidden `.agents/` folder.
+- These packages are for Codex and the Codex app, not Claude Code.
+
 ## Python Setup
 
 Create and activate the repo-local virtual environment with Python 3.11 or newer:

@@ -284,37 +284,191 @@ def _readme(tier: PackageTier, version: str) -> str:
         "",
         tier.capability,
         "",
-        "## Install",
+        "This is a downloadable package for installing PlantUML Diagram into one Codex project on macOS or Linux.",
         "",
-        "From the root of the project that should receive the skill:",
+        "This package is for Codex and the Codex app. It is not a Claude Code package and does not install into Claude Code.",
         "",
-        "```bash",
-        "bash install.sh",
+        "## What This Folder Is",
+        "",
+        "After you unzip the `.tar.gz` download, you get this unzipped installer folder.",
+        "",
+        "```text",
+        f"{tier.name}-{version}/",
+        "  README.md",
+        "  install.sh",
+        "  manifest.json",
+        "  payload/",
         "```",
         "",
-        "Installer options: `--dry-run`, `--force`, `--prefix .agents`, `--no-assets`, and `--offline-jar PATH`.",
+        "You are now inside the unzipped installer folder. The `payload/` folder is not the final installed location.",
         "",
+        "The installer copies the useful files into your project's hidden `.agents` folder, where Codex can read them.",
+        "",
+        "## Install Into Your Project",
+        "",
+        "Open Terminal and go to the root of the project that should receive the skill:",
+        "",
+        "```bash",
+        "cd /path/to/your-project",
+        "```",
+        "",
+        "Then run this installer script. Replace the path if you unzipped the package somewhere else:",
+        "",
+        "```bash",
+        f"bash /path/to/{tier.name}-{version}/install.sh",
+        "```",
+        "",
+        "If you unzipped this installer folder inside your project folder, you can use:",
+        "",
+        "```bash",
+        f"bash {tier.name}-{version}/install.sh",
+        "```",
+        "",
+        "After install, your project will contain files like these:",
+        "",
+        "```text",
+        "your-project/",
+        "  .agents/",
+        "    skills/",
+        "      plantuml-diagram/",
     ]
+    if tier.include_validator:
+        lines.extend(
+            [
+                "    bin/",
+                "      plantuml-ai",
+            ]
+        )
     if tier.include_runtime:
         lines.extend(
             [
-                "## Runtime Dependencies",
+                "    tools/",
+                "      plantuml-ai-skill/",
+            ]
+        )
+    if tier.include_c4:
+        lines.extend(
+            [
+                "    vendor/",
+                "      c4-plantuml/",
+            ]
+        )
+    lines.extend(
+        [
+            "```",
+            "",
+            "Installer options for advanced users: `--dry-run`, `--force`, `--prefix .agents`, `--no-assets`, and `--offline-jar PATH`.",
+            "",
+        ]
+    )
+    if tier.include_validator:
+        lines.extend(
+            [
+                "## Use After Install",
+                "",
+                "Check a PlantUML file:",
+                "",
+                "```bash",
+                ".agents/bin/plantuml-ai validate diagram.puml",
+                "```",
+                "",
+            ]
+        )
+    if tier.include_runtime:
+        lines.extend(
+            [
+                "Render a diagram to SVG:",
+                "",
+                "```bash",
+                ".agents/bin/plantuml-ai render diagram.puml --output diagram.svg",
+                "```",
+                "",
+                "Check Java, Graphviz, and PlantUML setup:",
+                "",
+                "```bash",
+                ".agents/bin/plantuml-ai doctor",
+                "```",
+                "",
+            ]
+        )
+    if tier.include_c4:
+        lines.extend(
+            [
+                "Render a C4 diagram:",
+                "",
+                "```bash",
+                ".agents/bin/plantuml-ai render c4-diagram.puml --c4 --output c4-diagram.svg",
+                "```",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## What Gets Installed",
+            "",
+            "- Skill files go into `.agents/skills/plantuml-diagram/`.",
+        ]
+    )
+    if tier.include_validator:
+        lines.append("- The friendly command goes into `.agents/bin/plantuml-ai`.")
+    if tier.include_runtime:
+        lines.append("- Runtime files go into `.agents/tools/plantuml-ai-skill/`.")
+    if tier.include_c4:
+        lines.append("- Bundled C4 diagram support goes into `.agents/vendor/c4-plantuml/`.")
+    lines.append("")
+    lines.append("The `.agents` folder is hidden because its name starts with a dot. Codex uses this folder for project-local skills and tools.")
+    lines.append("")
+    if not tier.include_validator:
+        lines.extend(
+            [
+                "## Package Contents",
+                "",
+                "This package installs skill instructions only. It does not install the `.agents/bin/plantuml-ai` command.",
+                "",
+            ]
+        )
+    if tier.include_runtime:
+        lines.extend(
+            [
+                "## macOS And Linux Requirements For Rendering",
                 "",
                 "- Python 3.11 or newer",
                 "- Java 11 or newer",
-                "- Graphviz `dot`",
+                "- Graphviz",
                 "- Network access to download the pinned PlantUML jar unless `--offline-jar` or `--no-assets` is used",
+                "",
+                "On macOS with Homebrew:",
+                "",
+                "```bash",
+                "brew install python@3.12 openjdk graphviz",
+                "```",
+                "",
+                "On Ubuntu or Debian Linux:",
+                "",
+                "```bash",
+                "sudo apt update",
+                "sudo apt install python3 openjdk-17-jre graphviz curl",
+                "```",
+                "",
+                "Then run:",
+                "",
+                "```bash",
+                ".agents/bin/plantuml-ai init-assets",
+                ".agents/bin/plantuml-ai doctor",
+                "```",
                 "",
             ]
         )
     elif tier.include_validator:
-        lines.extend(["## Runtime Dependencies", "", "- `python3` for `.agents/bin/plantuml-ai validate`", ""])
+        lines.extend(["## Requirement", "", "- `python3` for `.agents/bin/plantuml-ai validate`", ""])
     if tier.include_c4:
         lines.extend(
             [
                 "## C4 Includes",
                 "",
-                f"This package vendors C4-PlantUML from commit `{C4_COMMIT}` under `.agents/vendor/c4-plantuml`.",
+                "This package includes bundled C4 diagram support.",
+                "",
+                f"It vendors C4-PlantUML from commit `{C4_COMMIT}` under `.agents/vendor/c4-plantuml`.",
                 "",
             ]
         )

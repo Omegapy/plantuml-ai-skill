@@ -44,10 +44,14 @@ def main() -> int:
 
 
 def _validate_with_repo_evaluator(args: argparse.Namespace, puml_text: str, path: Path) -> int:
+    matched_src_root = None
     for src_root in _candidate_src_roots():
         if (src_root / "plantuml_ai_skill" / "improvement" / "evaluator.py").exists():
+            matched_src_root = src_root
             sys.path.insert(0, str(src_root))
             break
+    if matched_src_root is None:
+        raise ModuleNotFoundError("local plantuml_ai_skill runtime not found")
 
     from plantuml_ai_skill.improvement.evaluator import evaluate_attempt
     from plantuml_ai_skill.improvement.models import SkillAttempt, SkillEvalCase

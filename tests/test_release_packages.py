@@ -106,9 +106,11 @@ class ReleasePackageTests(unittest.TestCase):
             invalid = project / "invalid.puml"
             invalid.write_text("@startuml\nAlice -> Bob: hi\n@enduml\n@startuml\nBob -> Alice: ok\n@enduml\n", encoding="utf-8")
             cli = project / ".agents" / "bin" / "plantuml-ai"
+            ambient_env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
             ok = subprocess.run(
                 [str(cli), "validate", str(valid), "--expected-type", "sequence", "--required", "Alice"],
                 cwd=project,
+                env=ambient_env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -117,6 +119,7 @@ class ReleasePackageTests(unittest.TestCase):
             bad = subprocess.run(
                 [str(cli), "validate", str(invalid)],
                 cwd=project,
+                env=ambient_env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,

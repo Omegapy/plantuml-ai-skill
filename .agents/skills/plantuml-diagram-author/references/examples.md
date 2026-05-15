@@ -44,6 +44,35 @@ stop
 @enduml
 ```
 
+## Large Activity
+
+```plantuml
+@startuml
+start
+:Receive request;
+if (Authorized?) then (yes)
+  fork
+    :Validate account;
+  fork again
+    :Check policy;
+  end fork
+  split
+    :Reserve capacity;
+  split again
+    :Notify reviewer;
+  end split
+else (no)
+  :Reject request;
+  stop
+endif
+repeat
+  :Collect approval;
+repeat while (More approvers?) is (yes)
+:Publish decision;
+stop
+@enduml
+```
+
 ## State
 
 ```plantuml
@@ -66,6 +95,34 @@ component "API" as API
 database "Database" as DB
 Web --> API : HTTPS
 API --> DB : SQL
+@enduml
+```
+
+## Large Sequence
+
+```plantuml
+@startuml
+actor User
+participant "Web App" as Web
+participant "Policy API" as Policy
+participant "Billing Service" as Billing
+participant "Audit Log" as Audit
+autonumber
+User -> Web: submit request
+par policy check
+  Web -> Policy: validate request
+  Policy --> Web: policy result
+else billing check
+  Web -> Billing: reserve funds
+  Billing --> Web: reservation id
+end
+alt approved
+  Web -> Audit: record approval
+  Web --> User: confirmation
+else rejected
+  Web -> Audit: record rejection
+  Web --> User: explain rejection
+end
 @enduml
 ```
 

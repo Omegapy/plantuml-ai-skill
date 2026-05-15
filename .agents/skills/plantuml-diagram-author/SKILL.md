@@ -26,8 +26,9 @@ Read `references/output-contract.md` when the user needs a strict machine-readab
 3. Add every required participant/entity before drawing relationships.
 4. Use clear labels on important edges, especially outcomes, errors, retries, ownership, and direction.
 5. For lifecycle requests, use a state diagram with explicit `state` declarations or `[*]` start/end transitions.
-6. Validate syntax shape locally before claiming success.
-7. When working in this repository, run `.agents/skills/plantuml-diagram-author/scripts/validate_plantuml_attempt.py` or `plantuml-skill improve evaluate` if an eval run exists.
+6. For large activity or sequence diagrams, plan nested blocks before writing them and close every `if`, `switch`, `repeat`, `while`, `fork`, `split`, `alt`, `loop`, `opt`, `par`, and `group` block in order.
+7. Validate syntax shape locally before claiming success.
+8. When working in this repository, run `.agents/skills/plantuml-diagram-author/scripts/validate_plantuml_attempt.py` or `plantuml-skill improve evaluate` if an eval run exists.
 
 ## Include Policy
 
@@ -46,8 +47,11 @@ Read `references/include-policy.md` before adding includes.
 - Choosing the wrong diagram family because a word like "flow" could mean sequence or activity.
 - Using C4 macros without a C4 include.
 - Omitting dashed return messages in sequence diagrams when the user asks for a response, error, or outcome.
+- Losing block balance in large workflows or traces, especially nested `split`/`fork` activity branches and `par`/`alt` sequence fragments.
 - Using remote includes, TODO placeholders, or fake entities not present in the prompt.
 
 ## Examples
 
 Read `references/examples.md` for concise examples of sequence, class, activity, state, component, use case, C4, and include-policy-safe diagrams.
+
+Read `references/large-diagram-patterns.md` when a request asks for a large, complex, parallel, branching, or stress-test activity/sequence diagram.

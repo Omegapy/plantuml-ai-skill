@@ -45,3 +45,37 @@ Use Python 3.12 or newer for validation commands. The system Python 3.9.6 fails 
 ```bash
 PYTHONPATH=src /opt/homebrew/opt/python@3.12/libexec/bin/python3 -m plantuml_ai_skill.cli ...
 ```
+
+## 2026-05-14/15: `large-pilot-training`
+
+Role: large-full evidence consolidation and release/readiness triage.
+
+Outcome: approved, promotion gate passed, and large-full synthetic scale validation passed the stability gate.
+
+The `large-pilot-training` run validated the updated `plantuml-diagram-author` skill after large synthetic evidence had been folded into the skill package. This was skill-package training, not model fine-tuning. The human approval record was written at `2026-05-15T01:05:53Z` under `data/improvement/approvals/large-pilot-training.json`, and the promotion gate returned:
+
+```json
+{
+  "promote": true,
+  "reasons": [],
+  "run_id": "large-pilot-training"
+}
+```
+
+Promotion metrics:
+
+| Run | Cases | Passed | Average Score | Render OK Rate | Semantic Pass Rate | Remote Include Violations |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `large-pilot-training` | 9 | 9 | 1.0 | 1.0 | 1.0 | 0 |
+
+Scale-validation context:
+
+- Large-full synthetic validation processed 59,924 input rows, rendered 59,924 rows, and verified 59,924 rows.
+- Rendering completed with 59,924 `ok`, 0 failed, and 0 skipped.
+- Verification completed with 29,298 `png_match`, 30,626 `png_mismatch`, and 0 verification errors.
+- The `verify` command's nonzero exit from PNG mismatches was expected; the accepted stability gate is `verify_error == 0`.
+- Large-full split generation selected 5,000 augmentation rows and 0 train/gold-eval rows.
+
+Readiness decision:
+
+The repo-scoped skill is package-ready at the current promotion level. The large-full mismatch population is diagnostic evidence about renderer/version/layout drift, not a blocker for release. The next improvement loop should only start if the project chooses to improve diagram fidelity or curation from selected mismatch families, especially activity `group` warning banners and high-distance sequence layout drift. Otherwise, avoid more generated-data churn and package the promoted skill as-is.

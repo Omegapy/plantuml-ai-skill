@@ -288,6 +288,8 @@ def _readme(tier: PackageTier, version: str) -> str:
         "",
         "This package is for Codex and the Codex app. It is not a Claude Code package and does not install into Claude Code.",
         "",
+        "It is for creating, checking, and rendering PlantUML diagrams. It is not for training, fine-tuning, or improving the skill.",
+        "",
         "## What This Folder Is",
         "",
         "After you unzip the `.tar.gz` download, you get this unzipped installer folder.",

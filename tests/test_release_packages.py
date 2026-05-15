@@ -77,6 +77,8 @@ class ReleasePackageTests(unittest.TestCase):
             self.assertIn("hidden `.agents` folder", readmes[archive_name])
             self.assertIn("for Codex and the Codex app", readmes[archive_name])
             self.assertIn("not a Claude Code package", readmes[archive_name])
+            self.assertIn("creating, checking, and rendering PlantUML diagrams", readmes[archive_name])
+            self.assertIn("not for training, fine-tuning, or improving the skill", readmes[archive_name])
         for archive_name in ("plantuml-diagram-render-test.tar.gz", "plantuml-diagram-c4-test.tar.gz"):
             self.assertIn("macOS And Linux Requirements For Rendering", readmes[archive_name])
             self.assertIn("Python 3.11 or newer", readmes[archive_name])

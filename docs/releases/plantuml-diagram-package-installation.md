@@ -4,6 +4,8 @@ This guide is for people who want to download one PlantUML Diagram package from 
 
 These packages are for **Codex** and the **Codex app**. They are not Claude Code packages, and they do not install into Claude Code.
 
+These packages are for creating, checking, and rendering PlantUML diagrams in Codex projects. They are not for training, fine-tuning, or improving the skill.
+
 You do not need to understand the release system. The important idea is:
 
 ```text

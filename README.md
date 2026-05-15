@@ -14,6 +14,7 @@ If you only want to install the PlantUML Diagram skill into your own Codex proje
 - Read the beginner guide: [PlantUML Diagram Package Installation Guide](docs/releases/plantuml-diagram-package-installation.md).
 - The package unzips into its own installer folder, and `install.sh` copies the files into your project's hidden `.agents/` folder.
 - These packages are for Codex and the Codex app, not Claude Code.
+- These packages are for creating, checking, and rendering PlantUML diagrams. They are not for training, fine-tuning, or improving the skill.
 
 ## Python Setup
 

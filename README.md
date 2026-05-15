@@ -8,11 +8,11 @@ This project provides a Python-based workflow that helps agents turn plain-langu
 
 ## For Users: Download a Package
 
-If you only want to install the PlantUML Diagram skill into your own Codex project on macOS or Linux, use the GitHub release packages instead of this developer setup.
+If you only want to install the PlantUML Diagram skill into your own Codex project on macOS, Linux, or Windows 11, use the GitHub release packages instead of this developer setup.
 
 - Download one package from the [v0.1.0 release](https://github.com/Omegapy/plantuml-ai-skill/releases/tag/v0.1.0).
 - Read the beginner guide: [PlantUML Diagram Package Installation Guide](docs/releases/plantuml-diagram-package-installation.md).
-- The package unzips into its own installer folder, and `install.sh` copies the files into your project's hidden `.agents/` folder.
+- The package unzips into its own installer folder. On macOS or Linux, `install.sh` copies the files into your project's hidden `.agents/` folder. On Windows 11, `install.ps1` or `install.cmd` does the same.
 - These packages are for Codex and the Codex app, not Claude Code.
 - These packages are for creating, checking, and rendering PlantUML diagrams. They are not for training, fine-tuning, or improving the skill.
 

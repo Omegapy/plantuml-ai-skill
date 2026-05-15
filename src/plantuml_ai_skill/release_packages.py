@@ -14,6 +14,7 @@ import sys
 import tarfile
 import tempfile
 import urllib.request
+import zipfile
 
 from .constants import PROJECT_ROOT
 
@@ -21,6 +22,7 @@ from .constants import PROJECT_ROOT
 C4_COMMIT = "1edfb8a878baaa821e54cf423a070c792e8677c6"
 C4_ARCHIVE_URL = f"https://github.com/plantuml-stdlib/C4-PlantUML/archive/{C4_COMMIT}.tar.gz"
 SKILL_DIR = PROJECT_ROOT / ".agents" / "skills" / "plantuml-diagram"
+SUPPORTED_PLATFORMS = ("posix", "windows", "all")
 
 RUNTIME_FILES = (
     "__init__.py",
@@ -103,44 +105,81 @@ def add_package_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser])
         default="",
         help="local C4-PlantUML checkout/include tree; defaults to downloading the pinned archive",
     )
+    build.add_argument(
+        "--platform",
+        choices=SUPPORTED_PLATFORMS,
+        default="all",
+        help="package platform target; defaults to building both POSIX tarballs and Windows zip files",
+    )
 
 
 def dispatch(args: argparse.Namespace) -> int:
     if args.package_command == "build":
-        outputs = build_release_packages(args.version, Path(args.output), c4_source=Path(args.c4_source) if args.c4_source else None)
+        outputs = build_release_packages(
+            args.version,
+            Path(args.output),
+            c4_source=Path(args.c4_source) if args.c4_source else None,
+            platform=args.platform,
+        )
         for path in outputs:
             print(path)
         return 0
     raise ValueError(f"unknown package command: {args.package_command}")
 
 
-def build_release_packages(version: str, output_dir: Path, c4_source: Path | None = None) -> list[Path]:
+def build_release_packages(
+    version: str,
+    output_dir: Path,
+    c4_source: Path | None = None,
+    platform: str = "all",
+) -> list[Path]:
     """Build all package tiers and return generated files."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     outputs: list[Path] = []
+    platforms = _selected_platforms(platform)
     with tempfile.TemporaryDirectory(prefix="plantuml-packages-") as tmp:
         workspace = Path(tmp)
         c4_root = _resolve_c4_source(c4_source, workspace)
         for tier in TIERS:
-            package_dir = _stage_package(tier, version, workspace, c4_root)
-            archive = output_dir / f"{tier.name}-{version}.tar.gz"
-            _write_deterministic_tar_gz(package_dir, archive)
-            outputs.append(archive)
+            for target_platform in platforms:
+                package_dir = _stage_package(tier, version, workspace, c4_root, target_platform)
+                if target_platform == "posix":
+                    archive = output_dir / f"{tier.name}-{version}.tar.gz"
+                    _write_deterministic_tar_gz(package_dir, archive)
+                else:
+                    archive = output_dir / f"{tier.name}-{version}-windows.zip"
+                    _write_deterministic_zip(package_dir, archive)
+                outputs.append(archive)
     sums = _write_sha256sums(outputs, output_dir / "SHA256SUMS")
     outputs.append(sums)
     return outputs
 
 
-def _stage_package(tier: PackageTier, version: str, workspace: Path, c4_root: Path | None) -> Path:
-    root = workspace / f"{tier.name}-{version}"
+def _selected_platforms(platform: str) -> tuple[str, ...]:
+    if platform == "all":
+        return ("posix", "windows")
+    if platform not in SUPPORTED_PLATFORMS:
+        raise ValueError(f"unsupported package platform: {platform}")
+    return (platform,)
+
+
+def _stage_package(
+    tier: PackageTier,
+    version: str,
+    workspace: Path,
+    c4_root: Path | None,
+    platform: str,
+) -> Path:
+    root_suffix = "" if platform == "posix" else "-windows"
+    root = workspace / f"{tier.name}-{version}{root_suffix}"
     payload = root / "payload"
     root.mkdir(parents=True)
     payload.mkdir()
 
-    _stage_skill(tier, payload)
+    _stage_skill(tier, payload, platform)
     if tier.include_validator:
-        _stage_bin(payload)
+        _stage_bin(payload, platform)
     if tier.include_runtime:
         _stage_runtime(payload)
     if tier.include_c4:
@@ -149,21 +188,29 @@ def _stage_package(tier: PackageTier, version: str, workspace: Path, c4_root: Pa
         _stage_c4(payload, c4_root)
 
     payload_files = _payload_files(payload)
-    manifest = _manifest(tier, version, payload_files)
+    archive_format = "tar.gz" if platform == "posix" else "zip"
+    manifest = _manifest(tier, version, payload_files, platform, archive_format)
     (root / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (root / "payload-files.txt").write_text("\n".join(payload_files) + "\n", encoding="utf-8")
-    (root / "README.md").write_text(_readme(tier, version), encoding="utf-8")
-    install = root / "install.sh"
-    install.write_text(_install_script(tier, version, _git_commit()), encoding="utf-8")
-    install.chmod(0o755)
+    (root / "README.md").write_text(_readme(tier, version, platform), encoding="utf-8")
+    source_commit = _git_commit()
+    if platform == "posix":
+        install = root / "install.sh"
+        install.write_text(_install_script(tier, version, source_commit), encoding="utf-8")
+        install.chmod(0o755)
+    else:
+        install_ps1 = root / "install.ps1"
+        install_ps1.write_text(_windows_install_script(tier, version, source_commit), encoding="utf-8")
+        install_cmd = root / "install.cmd"
+        install_cmd.write_text(_windows_install_cmd(), encoding="utf-8")
     return root
 
 
-def _stage_skill(tier: PackageTier, payload: Path) -> None:
+def _stage_skill(tier: PackageTier, payload: Path, platform: str) -> None:
     target = payload / "skills" / "plantuml-diagram"
     references = target / "references"
     references.mkdir(parents=True)
-    (target / "SKILL.md").write_text(_skill_text_for_tier(tier), encoding="utf-8")
+    (target / "SKILL.md").write_text(_skill_text_for_tier(tier, platform), encoding="utf-8")
     for source in sorted((SKILL_DIR / "references").iterdir()):
         if source.is_file():
             shutil.copy2(source, references / source.name)
@@ -175,12 +222,18 @@ def _stage_skill(tier: PackageTier, payload: Path) -> None:
         validator.chmod(0o755)
 
 
-def _stage_bin(payload: Path) -> None:
+def _stage_bin(payload: Path, platform: str) -> None:
     bin_dir = payload / "bin"
     bin_dir.mkdir(parents=True)
-    script = bin_dir / "plantuml-ai"
-    script.write_text(_plantuml_ai_wrapper(), encoding="utf-8")
-    script.chmod(0o755)
+    if platform == "posix":
+        script = bin_dir / "plantuml-ai"
+        script.write_text(_plantuml_ai_wrapper(), encoding="utf-8")
+        script.chmod(0o755)
+        return
+    script = bin_dir / "plantuml-ai.ps1"
+    script.write_text(_windows_plantuml_ai_wrapper(), encoding="utf-8")
+    cmd = bin_dir / "plantuml-ai.cmd"
+    cmd.write_text(_windows_plantuml_ai_cmd(), encoding="utf-8")
 
 
 def _stage_runtime(payload: Path) -> None:
@@ -224,25 +277,42 @@ def _payload_files(payload: Path) -> list[str]:
     return sorted(path.relative_to(payload).as_posix() for path in payload.rglob("*") if path.is_file())
 
 
-def _manifest(tier: PackageTier, version: str, payload_files: list[str]) -> dict[str, object]:
+def _manifest(
+    tier: PackageTier,
+    version: str,
+    payload_files: list[str],
+    platform: str,
+    archive_format: str,
+) -> dict[str, object]:
     dependencies = []
-    if tier.include_validator:
-        dependencies.append("python3")
     if tier.include_runtime:
-        dependencies.extend(["Python 3.11+", "Java 11+", "Graphviz dot", "network access for pinned PlantUML jar unless --offline-jar or --no-assets is used"])
+        dependencies.append("Python 3.11+" if platform == "posix" else "Python 3.11+ via the Python launcher or python.exe")
+    elif tier.include_validator:
+        dependencies.append("python3" if platform == "posix" else "Python launcher or python.exe")
+    if tier.include_runtime:
+        dependencies.extend(["Java 11+", "Graphviz dot", "network access for pinned PlantUML jar unless --offline-jar or --no-assets is used"])
+    entrypoints: list[str] = []
+    if tier.include_validator:
+        if platform == "posix":
+            entrypoints.append(".agents/bin/plantuml-ai")
+        else:
+            entrypoints.extend([".agents/bin/plantuml-ai.cmd", ".agents/bin/plantuml-ai.ps1"])
     return {
         "package_name": tier.name,
         "version": version,
+        "platform": platform,
+        "archive_format": archive_format,
         "source_commit": _git_commit(),
         "capability": tier.capability,
         "dependencies": dependencies,
         "c4_commit": C4_COMMIT if tier.include_c4 else "",
         "default_prefix": ".agents",
+        "entrypoints": entrypoints,
         "payload_files": payload_files,
     }
 
 
-def _skill_text_for_tier(tier: PackageTier) -> str:
+def _skill_text_for_tier(tier: PackageTier, platform: str) -> str:
     text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
     if not tier.include_validator:
         text = text.replace(
@@ -263,28 +333,47 @@ def _skill_text_for_tier(tier: PackageTier) -> str:
         "",
         "## Installed Tooling",
         "",
-        "- Run `.agents/bin/plantuml-ai validate <attempt.md|diagram.puml>` to check one generated attempt.",
     ]
+    if platform == "posix":
+        tooling.append("- Run `.agents/bin/plantuml-ai validate <attempt.md|diagram.puml>` to check one generated attempt.")
+    else:
+        tooling.append("- Run `.agents\\bin\\plantuml-ai.cmd validate <attempt.md|diagram.puml>` to check one generated attempt on Windows.")
     if tier.include_runtime:
-        tooling.extend(
-            [
-                "- Run `.agents/bin/plantuml-ai render <diagram.puml|-> --format svg --output diagram.svg` to render.",
-                "- Run `.agents/bin/plantuml-ai doctor` to check Java, Graphviz, and the pinned PlantUML jar.",
-                "- Run `.agents/bin/plantuml-ai init-assets` to download the pinned PlantUML jar.",
-            ]
-        )
+        if platform == "posix":
+            tooling.extend(
+                [
+                    "- Run `.agents/bin/plantuml-ai render <diagram.puml|-> --format svg --output diagram.svg` to render.",
+                    "- Run `.agents/bin/plantuml-ai doctor` to check Java, Graphviz, and the pinned PlantUML jar.",
+                    "- Run `.agents/bin/plantuml-ai init-assets` to download the pinned PlantUML jar.",
+                ]
+            )
+        else:
+            tooling.extend(
+                [
+                    "- Run `.agents\\bin\\plantuml-ai.cmd render <diagram.puml|-> --format svg --output diagram.svg` to render on Windows.",
+                    "- Run `.agents\\bin\\plantuml-ai.cmd doctor` to check Java, Graphviz, and the pinned PlantUML jar.",
+                    "- Run `.agents\\bin\\plantuml-ai.cmd init-assets` to download the pinned PlantUML jar.",
+                ]
+            )
     if tier.include_c4:
         tooling.append("- Pass `--c4` to validation or rendering commands for the bundled C4-PlantUML include root.")
     return text.rstrip() + "\n" + "\n".join(tooling) + "\n"
 
 
-def _readme(tier: PackageTier, version: str) -> str:
+def _readme(tier: PackageTier, version: str, platform: str) -> str:
+    is_windows = platform == "windows"
+    archive_name = f"{tier.name}-{version}-windows.zip" if is_windows else f"{tier.name}-{version}.tar.gz"
+    folder_name = f"{tier.name}-{version}-windows" if is_windows else f"{tier.name}-{version}"
+    platform_label = "Windows 11" if is_windows else "macOS or Linux"
+    command_path = ".agents\\bin\\plantuml-ai.cmd" if is_windows else ".agents/bin/plantuml-ai"
+    fence = "```powershell" if is_windows else "```bash"
+    install_files = ["  install.ps1", "  install.cmd"] if is_windows else ["  install.sh"]
     lines = [
         f"# {tier.name} {version}",
         "",
         tier.capability,
         "",
-        "This is a downloadable package for installing PlantUML Diagram into one Codex project on macOS or Linux.",
+        f"This is a downloadable package for installing PlantUML Diagram into one Codex project on {platform_label}.",
         "",
         "This package is for Codex and the Codex app. It is not a Claude Code package and does not install into Claude Code.",
         "",
@@ -292,12 +381,12 @@ def _readme(tier: PackageTier, version: str) -> str:
         "",
         "## What This Folder Is",
         "",
-        "After you unzip the `.tar.gz` download, you get this unzipped installer folder.",
+        f"After you unzip the `{archive_name}` download, you get this unzipped installer folder.",
         "",
         "```text",
-        f"{tier.name}-{version}/",
+        f"{folder_name}/",
         "  README.md",
-        "  install.sh",
+        *install_files,
         "  manifest.json",
         "  payload/",
         "```",
@@ -308,61 +397,80 @@ def _readme(tier: PackageTier, version: str) -> str:
         "",
         "## Install Into Your Project",
         "",
-        "Open Terminal and go to the root of the project that should receive the skill:",
-        "",
-        "```bash",
-        "cd /path/to/your-project",
-        "```",
-        "",
-        "Then run this installer script. Replace the path if you unzipped the package somewhere else:",
-        "",
-        "```bash",
-        f"bash /path/to/{tier.name}-{version}/install.sh",
-        "```",
-        "",
-        "If you unzipped this installer folder inside your project folder, you can use:",
-        "",
-        "```bash",
-        f"bash {tier.name}-{version}/install.sh",
-        "```",
-        "",
-        "After install, your project will contain files like these:",
-        "",
-        "```text",
-        "your-project/",
-        "  .agents/",
-        "    skills/",
-        "      plantuml-diagram/",
     ]
-    if tier.include_validator:
+    if is_windows:
         lines.extend(
             [
-                "    bin/",
-                "      plantuml-ai",
+                "Open PowerShell and go to the root of the project that should receive the skill:",
+                "",
+                "```powershell",
+                "Set-Location C:\\path\\to\\your-project",
+                "```",
+                "",
+                "Then run this installer script. Replace the path if you unzipped the package somewhere else:",
+                "",
+                "```powershell",
+                f"powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\path\\to\\{folder_name}\\install.ps1",
+                "```",
+                "",
+                "If you unzipped this installer folder inside your project folder, you can use:",
+                "",
+                "```powershell",
+                f".\\{folder_name}\\install.cmd",
+                "```",
+                "",
             ]
         )
-    if tier.include_runtime:
+    else:
         lines.extend(
             [
-                "    tools/",
-                "      plantuml-ai-skill/",
-            ]
-        )
-    if tier.include_c4:
-        lines.extend(
-            [
-                "    vendor/",
-                "      c4-plantuml/",
+                "Open Terminal and go to the root of the project that should receive the skill:",
+                "",
+                "```bash",
+                "cd /path/to/your-project",
+                "```",
+                "",
+                "Then run this installer script. Replace the path if you unzipped the package somewhere else:",
+                "",
+                "```bash",
+                f"bash /path/to/{folder_name}/install.sh",
+                "```",
+                "",
+                "If you unzipped this installer folder inside your project folder, you can use:",
+                "",
+                "```bash",
+                f"bash {folder_name}/install.sh",
+                "```",
+                "",
             ]
         )
     lines.extend(
         [
-            "```",
+            "After install, your project will contain files like these:",
             "",
-            "Installer options for advanced users: `--dry-run`, `--force`, `--prefix .agents`, `--no-assets`, and `--offline-jar PATH`.",
-            "",
+            "```text",
+            "your-project/",
+            "  .agents/",
+            "    skills/",
+            "      plantuml-diagram/",
         ]
     )
+    if tier.include_validator:
+        lines.append("    bin/")
+        if is_windows:
+            lines.extend(["      plantuml-ai.cmd", "      plantuml-ai.ps1"])
+        else:
+            lines.append("      plantuml-ai")
+    if tier.include_runtime:
+        lines.extend(["    tools/", "      plantuml-ai-skill/"])
+    if tier.include_c4:
+        lines.extend(["    vendor/", "      c4-plantuml/"])
+    options = (
+        "Installer options for advanced users: `-DryRun`, `-Force`, `-Prefix .agents`, `-NoAssets`, and `-OfflineJar PATH`."
+        if is_windows
+        else "Installer options for advanced users: `--dry-run`, `--force`, `--prefix .agents`, `--no-assets`, and `--offline-jar PATH`."
+    )
+    lines.extend(["```", "", options, ""])
     if tier.include_validator:
         lines.extend(
             [
@@ -370,8 +478,8 @@ def _readme(tier: PackageTier, version: str) -> str:
                 "",
                 "Check a PlantUML file:",
                 "",
-                "```bash",
-                ".agents/bin/plantuml-ai validate diagram.puml",
+                fence,
+                f"{command_path} validate diagram.puml",
                 "```",
                 "",
             ]
@@ -381,14 +489,14 @@ def _readme(tier: PackageTier, version: str) -> str:
             [
                 "Render a diagram to SVG:",
                 "",
-                "```bash",
-                ".agents/bin/plantuml-ai render diagram.puml --output diagram.svg",
+                fence,
+                f"{command_path} render diagram.puml --output diagram.svg",
                 "```",
                 "",
                 "Check Java, Graphviz, and PlantUML setup:",
                 "",
-                "```bash",
-                ".agents/bin/plantuml-ai doctor",
+                fence,
+                f"{command_path} doctor",
                 "```",
                 "",
             ]
@@ -398,21 +506,18 @@ def _readme(tier: PackageTier, version: str) -> str:
             [
                 "Render a C4 diagram:",
                 "",
-                "```bash",
-                ".agents/bin/plantuml-ai render c4-diagram.puml --c4 --output c4-diagram.svg",
+                fence,
+                f"{command_path} render c4-diagram.puml --c4 --output c4-diagram.svg",
                 "```",
                 "",
             ]
         )
-    lines.extend(
-        [
-            "## What Gets Installed",
-            "",
-            "- Skill files go into `.agents/skills/plantuml-diagram/`.",
-        ]
-    )
+    lines.extend(["## What Gets Installed", "", "- Skill files go into `.agents/skills/plantuml-diagram/`."])
     if tier.include_validator:
-        lines.append("- The friendly command goes into `.agents/bin/plantuml-ai`.")
+        if is_windows:
+            lines.append("- The friendly command wrappers go into `.agents/bin/plantuml-ai.cmd` and `.agents/bin/plantuml-ai.ps1`.")
+        else:
+            lines.append("- The friendly command goes into `.agents/bin/plantuml-ai`.")
     if tier.include_runtime:
         lines.append("- Runtime files go into `.agents/tools/plantuml-ai-skill/`.")
     if tier.include_c4:
@@ -425,44 +530,65 @@ def _readme(tier: PackageTier, version: str) -> str:
             [
                 "## Package Contents",
                 "",
-                "This package installs skill instructions only. It does not install the `.agents/bin/plantuml-ai` command.",
+                f"This package installs skill instructions only. It does not install the `{command_path}` command.",
                 "",
             ]
         )
     if tier.include_runtime:
+        requirements_heading = "## Windows 11 Requirements For Rendering" if is_windows else "## macOS And Linux Requirements For Rendering"
         lines.extend(
             [
-                "## macOS And Linux Requirements For Rendering",
+                requirements_heading,
                 "",
                 "- Python 3.11 or newer",
                 "- Java 11 or newer",
                 "- Graphviz",
-                "- Network access to download the pinned PlantUML jar unless `--offline-jar` or `--no-assets` is used",
-                "",
-                "On macOS with Homebrew:",
-                "",
-                "```bash",
-                "brew install python@3.12 openjdk graphviz",
-                "```",
-                "",
-                "On Ubuntu or Debian Linux:",
-                "",
-                "```bash",
-                "sudo apt update",
-                "sudo apt install python3 openjdk-17-jre graphviz curl",
-                "```",
-                "",
-                "Then run:",
-                "",
-                "```bash",
-                ".agents/bin/plantuml-ai init-assets",
-                ".agents/bin/plantuml-ai doctor",
-                "```",
+                "- Network access to download the pinned PlantUML jar unless the offline jar or no-assets option is used",
                 "",
             ]
         )
+        if is_windows:
+            lines.extend(
+                [
+                    "On Windows 11, install Python from python.org or the Microsoft Store, install Java 11 or newer, and install Graphviz with `dot.exe` on `PATH`.",
+                    "",
+                    "Then run:",
+                    "",
+                    "```powershell",
+                    ".agents\\bin\\plantuml-ai.cmd init-assets",
+                    ".agents\\bin\\plantuml-ai.cmd doctor",
+                    "```",
+                    "",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "On macOS with Homebrew:",
+                    "",
+                    "```bash",
+                    "brew install python@3.12 openjdk graphviz",
+                    "```",
+                    "",
+                    "On Ubuntu or Debian Linux:",
+                    "",
+                    "```bash",
+                    "sudo apt update",
+                    "sudo apt install python3 openjdk-17-jre graphviz curl",
+                    "```",
+                    "",
+                    "Then run:",
+                    "",
+                    "```bash",
+                    ".agents/bin/plantuml-ai init-assets",
+                    ".agents/bin/plantuml-ai doctor",
+                    "```",
+                    "",
+                ]
+            )
     elif tier.include_validator:
-        lines.extend(["## Requirement", "", "- `python3` for `.agents/bin/plantuml-ai validate`", ""])
+        requirement = "- Python for `.agents\\bin\\plantuml-ai.cmd validate`" if is_windows else "- `python3` for `.agents/bin/plantuml-ai validate`"
+        lines.extend(["## Requirement", "", requirement, ""])
     if tier.include_c4:
         lines.extend(
             [
@@ -602,6 +728,143 @@ fi
 """
 
 
+def _windows_install_script(tier: PackageTier, version: str, source_commit: str) -> str:
+    needs_assets = "1" if tier.requires_assets else "0"
+    dependency_note = (
+        'Write-Host "Dependencies: Python 3.11+, Java 11+, Graphviz dot, and network access unless -OfflineJar or -NoAssets is used."'
+        if tier.include_runtime
+        else ""
+    )
+    template = r"""param(
+  [switch]$DryRun,
+  [switch]$Force,
+  [switch]$NoAssets,
+  [string]$OfflineJar = "",
+  [string]$Prefix = ".agents"
+)
+
+$ErrorActionPreference = "Stop"
+
+$PackageName = "__PACKAGE_NAME__"
+$PackageVersion = "__PACKAGE_VERSION__"
+$SourceCommit = "__SOURCE_COMMIT__"
+$NeedsAssets = "__NEEDS_ASSETS__"
+
+function Exit-WithError {
+  param([string]$Message, [int]$Code = 1)
+  [Console]::Error.WriteLine($Message)
+  exit $Code
+}
+
+function Resolve-InstallPrefix {
+  param([string]$Value)
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    Exit-WithError "Install prefix is required." 2
+  }
+  $Normalized = $Value.Replace('/', '\')
+  if ([System.IO.Path]::IsPathRooted($Normalized) -or $Normalized -match '^[A-Za-z]:') {
+    Exit-WithError "Refusing to install outside the target project's .agents tree: $Value" 2
+  }
+  if ($Normalized.StartsWith("\\") -or $Normalized.StartsWith("//")) {
+    Exit-WithError "Refusing to install outside the target project's .agents tree: $Value" 2
+  }
+  if ($Normalized -ne ".agents" -and -not $Normalized.StartsWith(".agents\")) {
+    Exit-WithError "Refusing to install outside the target project's .agents tree: $Value" 2
+  }
+  if ($Normalized -match '(^|[\\/])\.\.($|[\\/])') {
+    Exit-WithError "Refusing path traversal in install prefix: $Value" 2
+  }
+  return $Normalized
+}
+
+$Prefix = Resolve-InstallPrefix $Prefix
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Payload = Join-Path $ScriptDir "payload"
+$FilesPath = Join-Path $ScriptDir "payload-files.txt"
+
+if (-not (Test-Path -LiteralPath $Payload -PathType Container) -or -not (Test-Path -LiteralPath $FilesPath -PathType Leaf)) {
+  Exit-WithError "Package payload is incomplete." 1
+}
+
+__DEPENDENCY_NOTE__
+
+$Files = Get-Content -LiteralPath $FilesPath | Where-Object { $_ -ne "" }
+
+foreach ($Rel in $Files) {
+  $RelPath = $Rel.Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+  $Src = Join-Path $Payload $RelPath
+  $Dst = Join-Path $Prefix $RelPath
+  if ((Test-Path -LiteralPath $Dst -PathType Leaf) -and -not $Force) {
+    $SrcHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Src).Hash
+    $DstHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Dst).Hash
+    if ($SrcHash -ne $DstHash) {
+      Exit-WithError "Refusing to overwrite existing file without -Force: $Dst" 1
+    }
+  }
+}
+
+foreach ($Rel in $Files) {
+  $RelPath = $Rel.Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+  $Src = Join-Path $Payload $RelPath
+  $Dst = Join-Path $Prefix $RelPath
+  if ($DryRun) {
+    Write-Host "would install $Dst"
+    continue
+  }
+  $DstDir = Split-Path -Parent $Dst
+  New-Item -ItemType Directory -Force -Path $DstDir | Out-Null
+  Copy-Item -LiteralPath $Src -Destination $Dst -Force
+}
+
+if (-not $DryRun) {
+  $ManifestDir = Join-Path $Prefix "plantuml-ai-skill"
+  New-Item -ItemType Directory -Force -Path $ManifestDir | Out-Null
+  $ManifestPath = Join-Path $ManifestDir "install-manifest.json"
+  $Manifest = [ordered]@{
+    package_name = $PackageName
+    version = $PackageVersion
+    source_commit = $SourceCommit
+    prefix = $Prefix
+    files = @($Files)
+  }
+  $Manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
+}
+
+if ((-not $DryRun) -and $NeedsAssets -eq "1" -and (-not $NoAssets)) {
+  $Cli = Join-Path $Prefix "bin\plantuml-ai.cmd"
+  if ($OfflineJar) {
+    & $Cli init-assets --offline-jar $OfflineJar
+  } else {
+    & $Cli init-assets
+  }
+  if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+  }
+}
+
+if ($DryRun) {
+  Write-Host "Dry run completed for $PackageName $PackageVersion"
+} else {
+  Write-Host "Installed $PackageName $PackageVersion into $Prefix"
+}
+"""
+    return (
+        template.replace("__PACKAGE_NAME__", tier.name)
+        .replace("__PACKAGE_VERSION__", version)
+        .replace("__SOURCE_COMMIT__", source_commit)
+        .replace("__NEEDS_ASSETS__", needs_assets)
+        .replace("__DEPENDENCY_NOTE__", dependency_note)
+    )
+
+
+def _windows_install_cmd() -> str:
+    return """@echo off
+setlocal
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1" %*
+exit /b %ERRORLEVEL%
+"""
+
+
 def _plantuml_ai_wrapper() -> str:
     return """#!/bin/sh
 set -eu
@@ -648,6 +911,116 @@ case "${1:-}" in
     exit 2
     ;;
 esac
+"""
+
+
+def _windows_plantuml_ai_wrapper() -> str:
+    return r"""$ErrorActionPreference = "Stop"
+
+$SelfDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$AgentsRoot = Resolve-Path -LiteralPath (Join-Path $SelfDir "..")
+$RuntimeSrc = Join-Path $AgentsRoot "tools\plantuml-ai-skill\src"
+
+function New-PythonCandidate {
+  param([string]$Exe, [string[]]$Args = @())
+  [pscustomobject]@{ Exe = $Exe; Args = $Args }
+}
+
+function Test-PythonCandidate {
+  param([object]$Candidate, [bool]$Require311)
+  if ($null -eq $Candidate -or [string]::IsNullOrWhiteSpace($Candidate.Exe)) {
+    return $false
+  }
+  $Code = if ($Require311) {
+    "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)"
+  } else {
+    "import sys"
+  }
+  try {
+    & $Candidate.Exe @($Candidate.Args) -c $Code > $null 2>&1
+    return $LASTEXITCODE -eq 0
+  } catch {
+    return $false
+  }
+}
+
+function Find-RuntimePython {
+  $Candidates = @(
+    (New-PythonCandidate -Exe $env:PLANTUML_PYTHON),
+    (New-PythonCandidate -Exe "py" -Args @("-3.12")),
+    (New-PythonCandidate -Exe "py" -Args @("-3.11")),
+    (New-PythonCandidate -Exe "python"),
+    (New-PythonCandidate -Exe "python3")
+  )
+  foreach ($Candidate in $Candidates) {
+    if (Test-PythonCandidate -Candidate $Candidate -Require311 $true) {
+      return $Candidate
+    }
+  }
+  return $null
+}
+
+function Find-PortablePython {
+  $Candidates = @(
+    (New-PythonCandidate -Exe $env:PLANTUML_PYTHON),
+    (New-PythonCandidate -Exe "py" -Args @("-3")),
+    (New-PythonCandidate -Exe "python"),
+    (New-PythonCandidate -Exe "python3")
+  )
+  foreach ($Candidate in $Candidates) {
+    if (Test-PythonCandidate -Candidate $Candidate -Require311 $false) {
+      return $Candidate
+    }
+  }
+  return $null
+}
+
+if (Test-Path -LiteralPath (Join-Path $RuntimeSrc "plantuml_ai_skill") -PathType Container) {
+  $RuntimePython = Find-RuntimePython
+  if ($null -eq $RuntimePython) {
+    [Console]::Error.WriteLine("plantuml-ai runtime packages require Python 3.11 or newer on PATH or through the Python launcher.")
+    exit 2
+  }
+  if ($env:PYTHONPATH) {
+    $env:PYTHONPATH = "$RuntimeSrc;$env:PYTHONPATH"
+  } else {
+    $env:PYTHONPATH = $RuntimeSrc
+  }
+  & $RuntimePython.Exe @($RuntimePython.Args) -m plantuml_ai_skill.consumer_cli --agents-root $AgentsRoot @args
+  exit $LASTEXITCODE
+}
+
+if ($args.Count -eq 0 -or $args[0] -eq "-h" -or $args[0] -eq "--help") {
+  [Console]::Error.WriteLine("Usage: plantuml-ai validate <attempt.md|diagram.puml> [options]")
+  exit 0
+}
+
+if ($args[0] -ne "validate") {
+  [Console]::Error.WriteLine("This package only installs 'plantuml-ai validate'. Install plantuml-diagram-render or plantuml-diagram-c4 for '$($args[0])'.")
+  exit 2
+}
+
+$PortablePython = Find-PortablePython
+if ($null -eq $PortablePython) {
+  [Console]::Error.WriteLine("plantuml-ai validate requires Python on PATH or through the Python launcher.")
+  exit 2
+}
+
+$Validator = Join-Path $AgentsRoot "skills\plantuml-diagram\scripts\validate_plantuml_attempt.py"
+$Remaining = @()
+if ($args.Count -gt 1) {
+  $Remaining = $args[1..($args.Count - 1)]
+}
+& $PortablePython.Exe @($PortablePython.Args) $Validator @Remaining
+exit $LASTEXITCODE
+"""
+
+
+def _windows_plantuml_ai_cmd() -> str:
+    return """@echo off
+setlocal
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0plantuml-ai.ps1" %*
+exit /b %ERRORLEVEL%
 """
 
 
@@ -706,6 +1079,26 @@ def _write_deterministic_tar_gz(source_dir: Path, output_path: Path) -> None:
                             tar.addfile(info, handle)
                     else:
                         tar.addfile(info)
+
+
+def _write_deterministic_zip(source_dir: Path, output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(output_path, mode="w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+        for path in sorted(source_dir.rglob("*")):
+            arcname = path.relative_to(source_dir.parent).as_posix()
+            if path.is_dir() and not arcname.endswith("/"):
+                arcname += "/"
+            info = zipfile.ZipInfo(arcname, date_time=(1980, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            if path.is_dir():
+                info.compress_type = zipfile.ZIP_STORED
+                info.external_attr = (0o40755 << 16) | 0x10
+                zf.writestr(info, b"")
+            else:
+                info.compress_type = zipfile.ZIP_DEFLATED
+                mode = 0o100755 if path.name.endswith((".sh", ".cmd", ".ps1")) or path.name == "plantuml-ai" else 0o100644
+                info.external_attr = mode << 16
+                zf.writestr(info, path.read_bytes())
 
 
 def _write_sha256sums(outputs: list[Path], path: Path) -> Path:

@@ -48,7 +48,11 @@ jobs:
         with:
           files: |
             dist/packages/plantuml-diagram-core-*.tar.gz
+            dist/packages/plantuml-diagram-core-*-windows.zip
             dist/packages/plantuml-diagram-validate-*.tar.gz
+            dist/packages/plantuml-diagram-validate-*-windows.zip
             dist/packages/plantuml-diagram-render-*.tar.gz
+            dist/packages/plantuml-diagram-render-*-windows.zip
             dist/packages/plantuml-diagram-c4-*.tar.gz
+            dist/packages/plantuml-diagram-c4-*-windows.zip
             dist/packages/SHA256SUMS

@@ -13,7 +13,7 @@ The repository preserves state.
 
 ## Components
 
-- `.agents/skills/plantuml-diagram-author/` teaches Codex to generate inspectable PlantUML.
+- `.agents/skills/plantuml-diagram/` teaches Codex to generate inspectable PlantUML.
 - `.agents/skills/plantuml-skill-improver/` teaches Codex to resume an improvement run from durable files.
 - `src/plantuml_ai_skill/improvement/` stores models, suite generation, attempt recording, evaluation, diagnostics, handoff generation, and promotion gates.
 - `schemas/skill-*.schema.json` documents the persisted JSON contracts.

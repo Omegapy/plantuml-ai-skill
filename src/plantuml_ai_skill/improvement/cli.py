@@ -26,7 +26,7 @@ from .promotion import has_human_approval, promotion_decision
 from .scoring import metrics_from_results
 from .skill_builder import (
     BUILDER_VERSION,
-    REQUIRED_AUTHOR_REFERENCES,
+    REQUIRED_DIAGRAM_REFERENCES,
     REQUIRED_IMPROVER_REFERENCES,
     SkillBuildConfig,
     build_skill_package,
@@ -35,7 +35,7 @@ from .skill_builder import (
 )
 from .state import (
     APPROVALS_ROOT,
-    AUTHOR_SKILL_DIR,
+    DIAGRAM_SKILL_DIR,
     IMPROVEMENT_ROOT,
     IMPROVER_SKILL_DIR,
     PROJECT_ROOT as STATE_PROJECT_ROOT,
@@ -62,10 +62,10 @@ def add_improve_parser(sub: argparse._SubParsersAction[argparse.ArgumentParser])
     lint = improve_sub.add_parser("lint-skill", help="lint repo-scoped PlantUML skill packages")
     lint.add_argument("--path", action="append", default=[])
 
-    build = improve_sub.add_parser("build-skill", help="build the target PlantUML author skill")
+    build = improve_sub.add_parser("build-skill", help="build the target PlantUML diagram skill")
     build.add_argument("--manifest", action="append", default=[])
     build.add_argument("--lessons", default="")
-    build.add_argument("--output", default=str(AUTHOR_SKILL_DIR))
+    build.add_argument("--output", default=str(DIAGRAM_SKILL_DIR))
     build.add_argument("--max-examples", type=int, default=6)
 
     suite = improve_sub.add_parser("make-suite", help="build a deterministic skill eval suite")
@@ -140,29 +140,29 @@ def dispatch(args: argparse.Namespace) -> int:
 def _init(args: argparse.Namespace) -> int:
     ensure_improvement_dirs()
     written: list[Path] = []
-    for skill_dir in (AUTHOR_SKILL_DIR, IMPROVER_SKILL_DIR):
+    for skill_dir in (DIAGRAM_SKILL_DIR, IMPROVER_SKILL_DIR):
         skill_dir.mkdir(parents=True, exist_ok=True)
 
-    author_skill = AUTHOR_SKILL_DIR / "SKILL.md"
-    if not author_skill.exists():
-        version = build_skill_package(SkillBuildConfig(output_dir=AUTHOR_SKILL_DIR))
+    diagram_skill = DIAGRAM_SKILL_DIR / "SKILL.md"
+    if not diagram_skill.exists():
+        version = build_skill_package(SkillBuildConfig(output_dir=DIAGRAM_SKILL_DIR))
         _ = version
-        written.append(author_skill)
+        written.append(diagram_skill)
     written.extend(_ensure_improver_skill_files(no_overwrite=args.no_overwrite))
 
-    if not (AUTHOR_SKILL_DIR / "skill-version.json").exists() and not args.no_overwrite:
+    if not (DIAGRAM_SKILL_DIR / "skill-version.json").exists() and not args.no_overwrite:
         version = SkillVersion(
             id=_current_skill_version_id(),
             created_at=utc_now(),
             git_commit=git_commit(),
-            skill_path=relative_to_project(author_skill),
-            skill_sha256=skill_hash(author_skill),
+            skill_path=relative_to_project(diagram_skill),
+            skill_sha256=skill_hash(diagram_skill),
             builder_version=BUILDER_VERSION,
             source_manifests=[],
             notes="Initialized from existing skill files",
         )
-        write_json(version, AUTHOR_SKILL_DIR / "skill-version.json")
-        written.append(AUTHOR_SKILL_DIR / "skill-version.json")
+        write_json(version, DIAGRAM_SKILL_DIR / "skill-version.json")
+        written.append(DIAGRAM_SKILL_DIR / "skill-version.json")
     starter_suite = SUITES_ROOT / "core.jsonl"
     if not starter_suite.exists():
         write_eval_cases(hand_authored_core_cases(), starter_suite)
@@ -180,10 +180,10 @@ def _init(args: argparse.Namespace) -> int:
 
 
 def _lint_skill(args: argparse.Namespace) -> int:
-    paths = [Path(path) for path in args.path] if args.path else [AUTHOR_SKILL_DIR, IMPROVER_SKILL_DIR]
+    paths = [Path(path) for path in args.path] if args.path else [DIAGRAM_SKILL_DIR, IMPROVER_SKILL_DIR]
     errors: list[str] = []
     for path in paths:
-        required = REQUIRED_AUTHOR_REFERENCES if path.name == "plantuml-diagram-author" else REQUIRED_IMPROVER_REFERENCES
+        required = REQUIRED_DIAGRAM_REFERENCES if path.name == "plantuml-diagram" else REQUIRED_IMPROVER_REFERENCES
         package_errors = lint_skill_package(path, required)
         for error in package_errors:
             errors.append(f"{path}: {error}")
@@ -377,14 +377,14 @@ def _default_run_id() -> str:
 
 
 def _current_skill_version_id() -> str:
-    version_path = AUTHOR_SKILL_DIR / "skill-version.json"
+    version_path = DIAGRAM_SKILL_DIR / "skill-version.json"
     if version_path.exists():
         try:
             data = json.loads(version_path.read_text(encoding="utf-8"))
             return str(data.get("id") or "")
         except json.JSONDecodeError:
             pass
-    skill_md = AUTHOR_SKILL_DIR / "SKILL.md"
+    skill_md = DIAGRAM_SKILL_DIR / "SKILL.md"
     if skill_md.exists():
         return f"skill-{skill_hash(skill_md)[:12]}"
     return f"skill-{git_commit()}"

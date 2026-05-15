@@ -17,7 +17,7 @@ RUNS_ROOT = IMPROVEMENT_ROOT / "runs"
 SUITES_ROOT = IMPROVEMENT_ROOT / "suites"
 APPROVALS_ROOT = IMPROVEMENT_ROOT / "approvals"
 INDEX_PATH = IMPROVEMENT_ROOT / "index.json"
-AUTHOR_SKILL_DIR = PROJECT_ROOT / ".agents" / "skills" / "plantuml-diagram-author"
+DIAGRAM_SKILL_DIR = PROJECT_ROOT / ".agents" / "skills" / "plantuml-diagram"
 IMPROVER_SKILL_DIR = PROJECT_ROOT / ".agents" / "skills" / "plantuml-skill-improver"
 
 

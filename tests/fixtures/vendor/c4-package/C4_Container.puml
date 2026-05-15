@@ -1,0 +1,16 @@
+' Minimal C4 fixture used by package installation tests.
+!procedure Person($alias, $label)
+actor "$label" as $alias
+!endprocedure
+
+!procedure Container($alias, $label, $technology="")
+rectangle "$label" as $alias
+!endprocedure
+
+!procedure System_Boundary($alias, $label)
+rectangle "$label" as $alias {
+!endprocedure
+
+!procedure Rel($from, $to, $label)
+$from --> $to : $label
+!endprocedure

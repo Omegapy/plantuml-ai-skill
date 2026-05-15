@@ -3,7 +3,7 @@ import tempfile
 import unittest
 
 from plantuml_ai_skill.improvement.skill_builder import (
-    REQUIRED_AUTHOR_REFERENCES,
+    REQUIRED_DIAGRAM_REFERENCES,
     SkillBuildConfig,
     build_skill_package,
     lint_skill_package,
@@ -14,17 +14,17 @@ from plantuml_ai_skill.improvement.skill_builder import (
 class SkillBuilderTests(unittest.TestCase):
     def test_builds_valid_skill_package(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            output = Path(tmp) / "plantuml-diagram-author"
+            output = Path(tmp) / "plantuml-diagram"
             version = build_skill_package(SkillBuildConfig(output_dir=output))
             skill_md = output / "SKILL.md"
             self.assertTrue(skill_md.exists())
             text = skill_md.read_text(encoding="utf-8")
-            self.assertIn("name: plantuml-diagram-author", text)
+            self.assertIn("name: plantuml-diagram", text)
             self.assertIn("Output Contract", text)
             self.assertIn("Include Policy", text)
             self.assertIn("diagram-family-playbook.md", text)
             self.assertEqual(version.skill_sha256, skill_hash(skill_md))
-            self.assertEqual([], lint_skill_package(output, REQUIRED_AUTHOR_REFERENCES))
+            self.assertEqual([], lint_skill_package(output, REQUIRED_DIAGRAM_REFERENCES))
 
     def test_rebuild_with_same_inputs_produces_same_skill_hash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

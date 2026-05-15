@@ -36,7 +36,7 @@ Validation context:
 
 Operational note:
 
-`plantuml-skill improve promote` is a gate reporter. It does not publish, install, tag, or copy the skill. For this repo, the approved candidate is the repo-scoped skill under `.agents/skills/plantuml-diagram-author/`; no additional mechanical promotion step was required.
+`plantuml-skill improve promote` is a gate reporter. It does not publish, install, tag, or copy the skill. For this repo, the approved candidate is the repo-scoped skill under `.agents/skills/plantuml-diagram/`; no additional mechanical promotion step was required.
 
 Environment note:
 
@@ -52,7 +52,7 @@ Role: large-full evidence consolidation and release/readiness triage.
 
 Outcome: approved, promotion gate passed, and large-full synthetic scale validation passed the stability gate.
 
-The `large-pilot-training` run validated the updated `plantuml-diagram-author` skill after large synthetic evidence had been folded into the skill package. This was skill-package training, not model fine-tuning. The human approval record was written at `2026-05-15T01:05:53Z` under `data/improvement/approvals/large-pilot-training.json`, and the promotion gate returned:
+The `large-pilot-training` run validated the updated `plantuml-diagram` skill after large synthetic evidence had been folded into the skill package. This was skill-package training, not model fine-tuning. The human approval record was written at `2026-05-15T01:05:53Z` under `data/improvement/approvals/large-pilot-training.json`, and the promotion gate returned:
 
 ```json
 {

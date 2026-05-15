@@ -34,6 +34,9 @@ jobs:
       - name: Check skill package
         run: plantuml-skill improve lint-skill
 
+      - name: Build install packages
+        run: plantuml-skill package build --version ci --output dist/packages --c4-source tests/fixtures/vendor/c4-package
+
       - name: Run fixture corpus smoke workflow
         run: |
           plantuml-skill coverage --json

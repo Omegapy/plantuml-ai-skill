@@ -1,6 +1,8 @@
-# PlantUML Diagram Author Skill `skill-b63b348d98c6`
+# PlantUML Diagram Skill `skill-b63b348d98c6`
 
 Release date: 2026-05-15
+
+Legacy naming note: this release evidence was originally prepared with the `plantuml-diagram-author` slug. The current canonical skill slug and archive root are `plantuml-diagram`.
 
 ## Artifacts
 
@@ -9,13 +11,13 @@ Release date: 2026-05-15
 Use this archive when installing the skill into another project or into the global Codex skills directory.
 
 ```text
-plantuml-diagram-author-installer-b63b348d98c6.tar.gz
+plantuml-diagram-installer-b63b348d98c6.tar.gz
 ```
 
 Local build location:
 
 ```text
-/private/tmp/plantuml-diagram-author-installer-b63b348d98c6-v2/
+/private/tmp/plantuml-diagram-installer-b63b348d98c6-v2/
 ```
 
 SHA-256:
@@ -28,7 +30,7 @@ The installer packet contains:
 
 - `README.md`
 - `install.sh`
-- `plantuml-diagram-author/`
+- `plantuml-diagram/`
 
 Install into one project:
 
@@ -45,7 +47,7 @@ Install globally for Codex:
 ### Skill-Only Archive
 
 ```text
-plantuml-diagram-author-skill-b63b348d98c6.tar.gz
+plantuml-diagram-skill-b63b348d98c6.tar.gz
 ```
 
 Local build location:
@@ -60,17 +62,17 @@ SHA-256:
 986120a3a9d81801a355f92fb4f28e4afe8a9621991207593edf3394c38c0de0
 ```
 
-The archive is rooted at `plantuml-diagram-author/` and contains only the promoted skill package.
+The archive is rooted at `plantuml-diagram/` and contains only the promoted skill package.
 
 ## Package Contents
 
-- `plantuml-diagram-author/SKILL.md`
-- `plantuml-diagram-author/references/diagram-family-playbook.md`
-- `plantuml-diagram-author/references/examples.md`
-- `plantuml-diagram-author/references/include-policy.md`
-- `plantuml-diagram-author/references/large-diagram-patterns.md`
-- `plantuml-diagram-author/references/output-contract.md`
-- `plantuml-diagram-author/scripts/validate_plantuml_attempt.py`
+- `plantuml-diagram/SKILL.md`
+- `plantuml-diagram/references/diagram-family-playbook.md`
+- `plantuml-diagram/references/examples.md`
+- `plantuml-diagram/references/include-policy.md`
+- `plantuml-diagram/references/large-diagram-patterns.md`
+- `plantuml-diagram/references/output-contract.md`
+- `plantuml-diagram/scripts/validate_plantuml_attempt.py`
 
 The validation helper is executable and portable. When the full `plantuml_ai_skill` evaluator is available, it uses it. Otherwise, it falls back to built-in PlantUML shape, required-pattern, forbidden-pattern, and diagram-family checks.
 
@@ -127,5 +129,5 @@ The archives and checksums are not committed to the repository. Attach them to a
 Suggested tag:
 
 ```text
-plantuml-diagram-author-installer-b63b348d98c6
+plantuml-diagram-installer-b63b348d98c6
 ```

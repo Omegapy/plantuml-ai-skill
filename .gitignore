@@ -38,6 +38,7 @@ Temporary Items
 /data/improvement/approvals/
 /data/improvement/index.json
 /tools/plantuml/
+/dist/
 /.cache/
 
 

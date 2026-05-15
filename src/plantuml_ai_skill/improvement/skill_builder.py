@@ -1,4 +1,4 @@
-"""Build and lint Codex skill packages for PlantUML diagram authoring."""
+"""Build and lint Codex skill packages for PlantUML diagram generation."""
 
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ from typing import Iterable
 from plantuml_ai_skill.manifest import CorpusRecord, read_jsonl as read_manifest_jsonl
 
 from .models import SkillVersion, write_json
-from .state import AUTHOR_SKILL_DIR, PROJECT_ROOT, git_commit, relative_to_project, utc_now
+from .state import DIAGRAM_SKILL_DIR, PROJECT_ROOT, git_commit, relative_to_project, utc_now
 
 
 BUILDER_VERSION = "0.1.0"
-REQUIRED_AUTHOR_REFERENCES = {
+REQUIRED_DIAGRAM_REFERENCES = {
     "diagram-family-playbook.md",
     "include-policy.md",
     "output-contract.md",
@@ -30,11 +30,11 @@ REQUIRED_IMPROVER_REFERENCES = {
 
 @dataclass(frozen=True)
 class SkillBuildConfig:
-    output_dir: Path = AUTHOR_SKILL_DIR
+    output_dir: Path = DIAGRAM_SKILL_DIR
     manifest_paths: list[Path] = field(default_factory=list)
     lessons_path: Path | None = None
     max_examples: int = 6
-    notes: str = "Generated PlantUML diagram author skill"
+    notes: str = "Generated PlantUML diagram skill"
 
 
 @dataclass(frozen=True)
@@ -58,7 +58,7 @@ def build_skill_package(config: SkillBuildConfig) -> SkillVersion:
     )
     skill_md = render_skill_markdown(context)
     (output_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
-    _write_author_references(references_dir, context)
+    _write_diagram_references(references_dir, context)
     script_path = scripts_dir / "validate_plantuml_attempt.py"
     if not script_path.exists():
         script_path.write_text(_validation_script_text(), encoding="utf-8")
@@ -84,11 +84,11 @@ def render_skill_markdown(context: SkillBuildContext) -> str:
     return "\n".join(
         [
             "---",
-            "name: plantuml-diagram-author",
+            "name: plantuml-diagram",
             "description: Generate, validate, and repair PlantUML diagrams from natural-language requests. Use for sequence, class, activity, state, use case, component, deployment, C4, mindmap, gantt, and other PlantUML diagram tasks.",
             "---",
             "",
-            "# PlantUML Diagram Author",
+            "# PlantUML Diagram",
             "",
             "## When To Use",
             "",
@@ -200,7 +200,7 @@ def _read_lessons(path: Path | None) -> list[str]:
     return lessons
 
 
-def _write_author_references(references_dir: Path, context: SkillBuildContext) -> None:
+def _write_diagram_references(references_dir: Path, context: SkillBuildContext) -> None:
     files = {
         "diagram-family-playbook.md": _diagram_family_reference(),
         "include-policy.md": _include_policy_reference(),
@@ -301,7 +301,7 @@ Rel(user, api, "Uses")
 
 
 def _validation_script_text() -> str:
-    script = PROJECT_ROOT / ".agents" / "skills" / "plantuml-diagram-author" / "scripts" / "validate_plantuml_attempt.py"
+    script = PROJECT_ROOT / ".agents" / "skills" / "plantuml-diagram" / "scripts" / "validate_plantuml_attempt.py"
     if script.exists():
         return script.read_text(encoding="utf-8")
     return "#!/usr/bin/env python3\nprint('Run plantuml-skill improve evaluate for validation.')\n"

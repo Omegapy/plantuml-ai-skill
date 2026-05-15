@@ -4,9 +4,9 @@ Date: 2026-05-15
 
 ## Decision
 
-The repo-scoped `plantuml-diagram-author` skill is ready to package from the current tracked state.
+The repo-scoped `plantuml-diagram` skill is ready to package from the current tracked state.
 
-This is a skill-package release decision, not model fine-tuning. The durable release surface is the skill directory under `.agents/skills/plantuml-diagram-author/`; generated manifests, rendered images, verification reports, and improvement-run artifacts under `data/` remain local evidence and are intentionally ignored by Git.
+This is a skill-package release decision, not model fine-tuning. The durable release surface is the skill directory under `.agents/skills/plantuml-diagram/`; generated manifests, rendered images, verification reports, and improvement-run artifacts under `data/` remain local evidence and are intentionally ignored by Git.
 
 ## Release Role
 
@@ -18,13 +18,13 @@ The steward's job is to preserve the promoted skill package, verify it, and publ
 
 Package these tracked files as the skill:
 
-- `.agents/skills/plantuml-diagram-author/SKILL.md`
-- `.agents/skills/plantuml-diagram-author/references/diagram-family-playbook.md`
-- `.agents/skills/plantuml-diagram-author/references/examples.md`
-- `.agents/skills/plantuml-diagram-author/references/include-policy.md`
-- `.agents/skills/plantuml-diagram-author/references/large-diagram-patterns.md`
-- `.agents/skills/plantuml-diagram-author/references/output-contract.md`
-- `.agents/skills/plantuml-diagram-author/scripts/validate_plantuml_attempt.py`
+- `.agents/skills/plantuml-diagram/SKILL.md`
+- `.agents/skills/plantuml-diagram/references/diagram-family-playbook.md`
+- `.agents/skills/plantuml-diagram/references/examples.md`
+- `.agents/skills/plantuml-diagram/references/include-policy.md`
+- `.agents/skills/plantuml-diagram/references/large-diagram-patterns.md`
+- `.agents/skills/plantuml-diagram/references/output-contract.md`
+- `.agents/skills/plantuml-diagram/scripts/validate_plantuml_attempt.py`
 
 Do not package generated `data/` artifacts unless a separate archival/reproducibility task explicitly asks for them.
 

@@ -1,0 +1,54 @@
+name: Release Packages
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release-packages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install renderer dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz openjdk-17-jre-headless
+
+      - name: Install package
+        run: python -m pip install -e .
+
+      - name: Download pinned PlantUML jar
+        run: plantuml-skill init-assets
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Check skill package
+        run: plantuml-skill improve lint-skill
+
+      - name: Build release packages
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          plantuml-skill package build --version "$version" --output dist/packages
+
+      - name: Verify package checksums
+        working-directory: dist/packages
+        run: sha256sum -c SHA256SUMS
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/packages/plantuml-diagram-core-*.tar.gz
+            dist/packages/plantuml-diagram-validate-*.tar.gz
+            dist/packages/plantuml-diagram-render-*.tar.gz
+            dist/packages/plantuml-diagram-c4-*.tar.gz
+            dist/packages/SHA256SUMS

@@ -7,7 +7,7 @@ description: Continue the human-triggered PlantUML skill improvement loop. Use w
 
 ## Goal
 
-Improve the repo-scoped `plantuml-diagram-author` skill using deterministic evaluation evidence. The loop is human-triggered: Codex proposes changes, the evaluator measures them, and a human approves promotion.
+Improve the repo-scoped `plantuml-diagram` skill using deterministic evaluation evidence. The loop is human-triggered: Codex proposes changes, the evaluator measures them, and a human approves promotion.
 
 ## Resume Workflow
 

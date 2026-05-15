@@ -50,6 +50,7 @@ from .verify import (
     svg_matches,
 )
 from .improvement.cli import add_improve_parser, dispatch as dispatch_improve
+from .release_packages import add_package_parser, dispatch as dispatch_package
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -207,6 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
     coverage.add_argument("--json", action="store_true")
 
     add_improve_parser(sub)
+    add_package_parser(sub)
 
     return parser
 
@@ -297,6 +299,8 @@ def main(argv: list[str] | None = None) -> int:
             return _coverage(args)
         if args.command == "improve":
             return dispatch_improve(args)
+        if args.command == "package":
+            return dispatch_package(args)
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

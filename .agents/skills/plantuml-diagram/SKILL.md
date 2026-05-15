@@ -1,9 +1,9 @@
 ---
-name: plantuml-diagram-author
+name: plantuml-diagram
 description: Generate, validate, and repair PlantUML diagrams from natural-language requests. Use for sequence, class, activity, state, use case, component, deployment, C4, mindmap, gantt, and other PlantUML diagram tasks.
 ---
 
-# PlantUML Diagram Author
+# PlantUML Diagram
 
 ## When To Use
 
@@ -28,7 +28,7 @@ Read `references/output-contract.md` when the user needs a strict machine-readab
 5. For lifecycle requests, use a state diagram with explicit `state` declarations or `[*]` start/end transitions.
 6. For large activity or sequence diagrams, plan nested blocks before writing them and close every `if`, `switch`, `repeat`, `while`, `fork`, `split`, `alt`, `loop`, `opt`, `par`, and `group` block in order.
 7. Validate syntax shape locally before claiming success.
-8. When working in this repository, run `.agents/skills/plantuml-diagram-author/scripts/validate_plantuml_attempt.py` or `plantuml-skill improve evaluate` if an eval run exists.
+8. When working in this repository, run `.agents/skills/plantuml-diagram/scripts/validate_plantuml_attempt.py` or `plantuml-skill improve evaluate` if an eval run exists.
 
 ## Include Policy
 

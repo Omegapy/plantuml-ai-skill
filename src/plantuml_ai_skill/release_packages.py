@@ -454,13 +454,28 @@ self_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 agents_root=$(CDPATH= cd -- "$self_dir/.." && pwd)
 runtime_src="$agents_root/tools/plantuml-ai-skill/src"
 
+find_runtime_python() {
+  for candidate in python3.12 python3.11 python3 python; do
+    if command -v "$candidate" >/dev/null 2>&1 &&
+      "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
 if [ -d "$runtime_src/plantuml_ai_skill" ]; then
+  runtime_python=$(find_runtime_python) || {
+    echo "plantuml-ai runtime packages require Python 3.11 or newer on PATH." >&2
+    exit 2
+  }
   if [ -n "${PYTHONPATH:-}" ]; then
     export PYTHONPATH="$runtime_src:$PYTHONPATH"
   else
     export PYTHONPATH="$runtime_src"
   fi
-  exec python3 -m plantuml_ai_skill.consumer_cli --agents-root "$agents_root" "$@"
+  exec "$runtime_python" -m plantuml_ai_skill.consumer_cli --agents-root "$agents_root" "$@"
 fi
 
 case "${1:-}" in

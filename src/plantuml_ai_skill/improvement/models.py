@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from typing import Any, Iterable, TypeVar
 
+from .palette import PALETTE_POLICY_NONE, normalize_palette_policy
+
 
 JsonObject = dict[str, Any]
 T = TypeVar("T")
@@ -59,6 +61,7 @@ class SkillEvalCase:
     allow_multiple_blocks: bool = False
     hidden: bool = False
     source_context: str = ""
+    palette_policy: str = PALETTE_POLICY_NONE
 
     @classmethod
     def from_mapping(cls, data: JsonObject) -> "SkillEvalCase":
@@ -85,6 +88,7 @@ class SkillEvalCase:
             allow_multiple_blocks=bool(data.get("allow_multiple_blocks", False)),
             hidden=bool(data.get("hidden", False)),
             source_context=str(data.get("source_context", "")),
+            palette_policy=normalize_palette_policy(str(data.get("palette_policy", PALETTE_POLICY_NONE))),
         )
 
     def to_mapping(self) -> JsonObject:

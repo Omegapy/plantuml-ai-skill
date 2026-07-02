@@ -8,6 +8,10 @@ import re
 from plantuml_ai_skill.manifest import CorpusRecord, read_jsonl as read_manifest_jsonl
 
 from .models import SkillEvalCase, read_jsonl, write_jsonl
+from .palette import (
+    PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED,
+    palette_policy_for_diagram_type,
+)
 
 
 def make_eval_suite_from_manifest(
@@ -60,6 +64,7 @@ def hand_authored_core_cases() -> list[SkillEvalCase]:
             forbidden_patterns=common_forbidden,
             required_edges=[],
             include_policy="self_contained_only",
+            palette_policy=PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED,
             purpose=["skill_eval", "regression"],
             difficulty="easy",
             tags=["activity", "branching", "self-contained"],
@@ -73,6 +78,7 @@ def hand_authored_core_cases() -> list[SkillEvalCase]:
             forbidden_patterns=common_forbidden,
             required_edges=[("User", "Account"), ("Account", "Subscription")],
             include_policy="self_contained_only",
+            palette_policy=PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED,
             purpose=["skill_eval", "regression"],
             difficulty="easy",
             tags=["class", "relationships"],
@@ -86,6 +92,7 @@ def hand_authored_core_cases() -> list[SkillEvalCase]:
             forbidden_patterns=common_forbidden,
             required_edges=[("Web App", "API"), ("API", "Database"), ("API", "Notification Service")],
             include_policy="self_contained_only",
+            palette_policy=PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED,
             purpose=["skill_eval", "regression"],
             difficulty="easy",
             tags=["component", "dependency"],
@@ -99,6 +106,7 @@ def hand_authored_core_cases() -> list[SkillEvalCase]:
             forbidden_patterns=common_forbidden + ["https://", "http://"],
             required_edges=[("Service A", "Service B")],
             include_policy="self_contained_only",
+            palette_policy=PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED,
             purpose=["skill_eval", "include_policy"],
             difficulty="easy",
             tags=["include-policy", "sequence", "self-contained"],
@@ -112,6 +120,7 @@ def hand_authored_core_cases() -> list[SkillEvalCase]:
             forbidden_patterns=common_forbidden,
             required_edges=[("Client", "API"), ("API", "Database")],
             include_policy="self_contained_only",
+            palette_policy=PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED,
             purpose=["skill_eval", "regression"],
             difficulty="easy",
             tags=["sequence", "error-path"],
@@ -125,6 +134,7 @@ def hand_authored_core_cases() -> list[SkillEvalCase]:
             forbidden_patterns=common_forbidden,
             required_edges=[("Draft", "Submitted"), ("Submitted", "Approved"), ("Submitted", "Rejected"), ("Rejected", "Draft")],
             include_policy="self_contained_only",
+            palette_policy=PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED,
             purpose=["skill_eval", "regression"],
             difficulty="easy",
             tags=["state", "lifecycle"],
@@ -138,6 +148,7 @@ def hand_authored_core_cases() -> list[SkillEvalCase]:
             forbidden_patterns=common_forbidden,
             required_edges=[("Customer", "Submit Ticket"), ("Support Agent", "Resolve Ticket")],
             include_policy="self_contained_only",
+            palette_policy=PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED,
             purpose=["skill_eval", "regression"],
             difficulty="easy",
             tags=["usecase", "actors"],
@@ -170,6 +181,7 @@ def _cases_from_manifest(records: list[CorpusRecord], include_hidden: bool = Fal
                 forbidden_patterns=["!includeurl", "TODO", "placeholder"],
                 required_edges=[],
                 include_policy="self_contained_only",
+                palette_policy=palette_policy_for_diagram_type("class"),
                 reference_record_id=source_record.id,
                 purpose=["source_conditioned_eval"],
                 difficulty="medium",
@@ -194,6 +206,7 @@ def _case_from_record(record: CorpusRecord) -> SkillEvalCase:
         forbidden_patterns=["!includeurl", "TODO", "placeholder"],
         required_edges=[],
         include_policy=include_policy,
+        palette_policy=palette_policy_for_diagram_type(record.diagram_type),
         reference_record_id=record.id,
         purpose=["skill_eval", "manifest_regression"],
         difficulty="medium",

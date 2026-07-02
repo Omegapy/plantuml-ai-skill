@@ -21,6 +21,7 @@ class EvalCasesTests(unittest.TestCase):
         families = {case.expected_diagram_type for case in cases}
         self.assertTrue({"sequence", "class", "activity", "component", "state", "usecase"} <= families)
         self.assertTrue(any("include-policy" in case.tags for case in cases))
+        self.assertTrue(all(case.palette_policy == "aether_dark_rendered_required" for case in cases))
 
     def test_manifest_suite_is_deterministic_and_round_trips(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

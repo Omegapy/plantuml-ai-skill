@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .eval_cases import load_eval_cases
 from .models import FailureCluster, ImprovementRun
+from .palette import PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED, PALETTE_POLICY_AETHER_DARK_REQUIRED
 
 
 def write_codex_generation_prompt(run: ImprovementRun) -> Path:
@@ -38,7 +39,9 @@ def write_codex_generation_prompt(run: ImprovementRun) -> Path:
                 "",
                 f"- expected type: `{case.expected_diagram_type}`",
                 f"- include policy: `{case.include_policy}`",
+                f"- palette policy: `{case.palette_policy}`",
                 *_case_guidance(case.expected_diagram_type, case.include_policy),
+                *_palette_guidance(case.palette_policy),
                 "",
             ]
         )
@@ -50,7 +53,19 @@ def write_codex_generation_prompt(run: ImprovementRun) -> Path:
 def _case_guidance(expected_diagram_type: str, include_policy: str) -> list[str]:
     if expected_diagram_type.lower() == "c4" and include_policy != "self_contained_only":
         return [
-            "- C4 guidance: use the vendored include, for example `!include C4_Container.puml`; do not reimplement C4 macros inline.",
+            "- C4 guidance: use `!include <C4/C4_Container.puml>`; repo validation maps it to the vendored C4 snapshot; do not reimplement C4 macros inline.",
+        ]
+    return []
+
+
+def _palette_guidance(palette_policy: str) -> list[str]:
+    if palette_policy == PALETTE_POLICY_AETHER_DARK_REQUIRED:
+        return [
+            "- Palette guidance: insert the AEther dark PlantUML style block immediately after `@start...` and use only contract colors.",
+        ]
+    if palette_policy == PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED:
+        return [
+            "- Palette guidance: insert the certified AEther dark family style block immediately after `@start...`; rendered SVG must have no warning banner, no fallback colors, and readable role contrast.",
         ]
     return []
 

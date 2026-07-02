@@ -18,6 +18,14 @@ from plantuml_ai_skill.verify import svg_hash
 
 from .attempts import attempt_text
 from .models import Failure, SkillAttempt, SkillEvalCase, SkillEvaluationResult
+from .palette import (
+    PALETTE_POLICY_AETHER_DARK_REQUIRED,
+    PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED,
+    PALETTE_POLICY_NONE,
+    aether_dark_palette_issues,
+    aether_dark_rendered_palette_issues,
+    has_rendered_palette_issues,
+)
 from .scoring import metrics_from_results, score_statuses
 
 
@@ -71,6 +79,7 @@ def evaluate_attempt(
     output_contract_status = _output_contract_status(case, raw_text, puml, failures, len(blocks))
     render_status, render_hash, rendered_path = _render_status(
         case,
+        puml,
         render_text,
         renderer,
         failures,
@@ -283,19 +292,59 @@ def _output_contract_status(
         failed = True
     if not puml.strip().lower().startswith("@start"):
         failed = True
+    if _palette_policy_failed(case, puml, failures):
+        failed = True
     return "failed" if failed else "ok"
+
+
+def _palette_policy_failed(case: SkillEvalCase, puml: str, failures: list[Failure]) -> bool:
+    if case.palette_policy == PALETTE_POLICY_NONE:
+        return False
+    if case.palette_policy not in {
+        PALETTE_POLICY_AETHER_DARK_REQUIRED,
+        PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED,
+    }:
+        failures.append(
+            Failure(
+                "invalid_palette_policy",
+                f"Unknown palette policy: {case.palette_policy}.",
+                details={"palette_policy": case.palette_policy},
+            )
+        )
+        return True
+    missing, unapproved = aether_dark_palette_issues(puml)
+    if not missing and not unapproved:
+        return False
+    failures.append(
+        Failure(
+            "palette_policy_violation",
+            "PlantUML does not satisfy the AEther dark palette contract.",
+            details={"missing_required_colors": missing, "unapproved_colors": unapproved},
+        )
+    )
+    return True
 
 
 def _render_status(
     case: SkillEvalCase,
-    puml: str,
+    source_puml: str,
+    render_puml: str,
     renderer: PlantUMLRenderer | None,
     failures: list[Failure],
     render_dir: Path | None,
 ) -> tuple[str, str, Path | None]:
     if renderer is None:
+        if case.palette_policy == PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED:
+            failures.append(
+                Failure(
+                    "render_palette_check_skipped",
+                    "AEther rendered palette policy requires renderer output, but rendering was skipped.",
+                    details={"palette_policy": case.palette_policy},
+                )
+            )
+            return "failed", "", None
         return "skipped", "", None
-    result = renderer.render_svg(puml)
+    result = renderer.render_svg(render_puml)
     if not result.ok:
         failures.append(
             Failure(
@@ -305,6 +354,21 @@ def _render_status(
             )
         )
         return "failed", "", None
+    if case.palette_policy == PALETTE_POLICY_AETHER_DARK_RENDERED_REQUIRED:
+        issues = aether_dark_rendered_palette_issues(
+            result.output,
+            puml=source_puml,
+            diagram_type=case.expected_diagram_type,
+        )
+        if has_rendered_palette_issues(issues):
+            failures.append(
+                Failure(
+                    "render_palette_policy_violation",
+                    "Rendered SVG does not satisfy the AEther dark render palette contract.",
+                    details=issues,
+                )
+            )
+            return "failed", "", None
     try:
         digest = svg_hash(result.output)
     except Exception as exc:

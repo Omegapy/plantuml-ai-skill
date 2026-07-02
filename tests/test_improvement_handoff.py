@@ -55,6 +55,7 @@ class ImprovementHandoffTests(unittest.TestCase):
                         forbidden_patterns=["!includeurl"],
                         required_edges=[],
                         include_policy="local_includes_allowed",
+                        palette_policy="aether_dark_rendered_required",
                         purpose=["skill_eval"],
                         difficulty="medium",
                         tags=["c4"],
@@ -76,8 +77,10 @@ class ImprovementHandoffTests(unittest.TestCase):
             )
             path = write_codex_generation_prompt(run)
             text = path.read_text(encoding="utf-8")
-        self.assertIn("!include C4_Container.puml", text)
+        self.assertIn("!include <C4/C4_Container.puml>", text)
         self.assertIn("do not reimplement C4 macros inline", text)
+        self.assertIn("palette policy: `aether_dark_rendered_required`", text)
+        self.assertIn("rendered SVG must have no warning banner", text)
 
 
 if __name__ == "__main__":

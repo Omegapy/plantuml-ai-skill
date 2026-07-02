@@ -7,7 +7,7 @@ Allowed:
 - No includes.
 - Local/vendored includes already present in the repository.
 - C4 includes when the user explicitly asks for C4 notation or the repo has configured vendored C4 support.
-- For C4 container diagrams in this repo, prefer `!include C4_Container.puml` from `data/vendor/c4-plantuml`.
+- For C4 container diagrams, prefer `!include <C4/C4_Container.puml>`. The public PlantUML server can resolve this standard-library form, and repo validation maps it to `data/vendor/c4-plantuml`.
 
 Blocked:
 

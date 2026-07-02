@@ -33,6 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--required-edge", action="append", default=[])
     validate.add_argument("--forbidden", action="append", default=["!includeurl", "TODO", "placeholder"])
     validate.add_argument("--include-root", action="append", default=[])
+    validate.add_argument(
+        "--palette-policy",
+        choices=["none", "aether-dark", "aether_dark_required", "aether-dark-rendered", "aether_dark_rendered_required"],
+        default="none",
+    )
     validate.add_argument("--render", action="store_true")
     validate.add_argument("--render-dir", default="")
     validate.add_argument("--c4", action="store_true")
@@ -105,6 +110,7 @@ def _validate(args: argparse.Namespace, agents_root: Path) -> int:
         forbidden_patterns=list(args.forbidden),
         required_edges=_required_edges(args.required_edge),
         include_policy=include_policy,
+        palette_policy=_palette_policy(args.palette_policy),
         purpose=["manual"],
         difficulty="manual",
         tags=["manual"],
@@ -206,6 +212,14 @@ def _required_edges(values: list[str]) -> list[tuple[str, str]]:
             raise ValueError(f"--required-edge must include both endpoints: {value!r}")
         edges.append((left, right))
     return edges
+
+
+def _palette_policy(value: str) -> str:
+    if value == "aether-dark":
+        return "aether_dark_required"
+    if value == "aether-dark-rendered":
+        return "aether_dark_rendered_required"
+    return value
 
 
 def _discover_agents_root() -> Path:

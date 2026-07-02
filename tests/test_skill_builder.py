@@ -23,6 +23,8 @@ class SkillBuilderTests(unittest.TestCase):
             self.assertIn("Output Contract", text)
             self.assertIn("Include Policy", text)
             self.assertIn("diagram-family-playbook.md", text)
+            self.assertIn("palette-contract.md", text)
+            self.assertTrue((output / "references" / "palette-contract.md").exists())
             self.assertEqual(version.skill_sha256, skill_hash(skill_md))
             self.assertEqual([], lint_skill_package(output, REQUIRED_DIAGRAM_REFERENCES))
 

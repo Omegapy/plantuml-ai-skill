@@ -11,6 +11,7 @@ from typing import Iterable
 from plantuml_ai_skill.manifest import CorpusRecord, read_jsonl as read_manifest_jsonl
 
 from .models import SkillVersion, write_json
+from .palette import AETHER_DARK_C4_STYLE_BLOCK, C4_CONTAINER_INCLUDE, aether_dark_style_block
 from .state import DIAGRAM_SKILL_DIR, PROJECT_ROOT, git_commit, relative_to_project, utc_now
 
 
@@ -19,6 +20,7 @@ REQUIRED_DIAGRAM_REFERENCES = {
     "diagram-family-playbook.md",
     "include-policy.md",
     "output-contract.md",
+    "palette-contract.md",
     "examples.md",
 }
 REQUIRED_IMPROVER_REFERENCES = {
@@ -99,18 +101,21 @@ def render_skill_markdown(context: SkillBuildContext) -> str:
             "- Emit exactly one complete PlantUML document unless the user explicitly asks for multiple diagrams.",
             "- Include a matching `@start...` and `@end...` pair.",
             "- Preserve required actors, systems, relationships, labels, constraints, and requested style.",
+            "- Use the AEther dark PlantUML palette by default unless the user explicitly requests a different style.",
             "- Avoid TODOs, placeholders, prose-only answers, and arbitrary remote includes.",
             "",
             "Read `references/output-contract.md` when strict formatting matters.",
+            "Read `references/palette-contract.md` before writing the style block.",
             "",
             "## Generation Workflow",
             "",
             "1. Choose the diagram family from intent, using `references/diagram-family-playbook.md` when needed.",
-            "2. Draft self-contained PlantUML first.",
-            "3. Add participants/entities before relationships.",
-            "4. Label important edges and outcomes.",
-            "5. For lifecycle requests, use explicit state syntax such as `state` declarations or `[*]` transitions.",
-            "6. Validate locally with the bundled script or `plantuml-skill improve evaluate` when a run exists.",
+            "2. Add the matching AEther dark family style block from `references/palette-contract.md` immediately after `@start...` unless the user explicitly asks for another style.",
+            "3. Draft self-contained PlantUML first.",
+            "4. Add participants/entities before relationships.",
+            "5. Label important edges and outcomes.",
+            "6. For strict AEther activity/state diagrams, prefer explicit styled Start/End nodes over unstyleable pseudo-nodes such as `start`, `stop`, and `[*]`.",
+            "7. Validate locally with the bundled script or `plantuml-skill improve evaluate` when a run exists.",
             "",
             "## Include Policy",
             "",
@@ -129,6 +134,7 @@ def render_skill_markdown(context: SkillBuildContext) -> str:
             "- `references/diagram-family-playbook.md`",
             "- `references/include-policy.md`",
             "- `references/output-contract.md`",
+            "- `references/palette-contract.md`",
             "- `references/examples.md`",
             "",
         ]
@@ -205,6 +211,7 @@ def _write_diagram_references(references_dir: Path, context: SkillBuildContext) 
         "diagram-family-playbook.md": _diagram_family_reference(),
         "include-policy.md": _include_policy_reference(),
         "output-contract.md": _output_contract_reference(),
+        "palette-contract.md": _palette_contract_reference(),
         "examples.md": _examples_reference(context.examples),
     }
     for name, text in files.items():
@@ -242,20 +249,20 @@ def _diagram_family_reference() -> str:
 - Sequence: time-ordered calls, responses, callbacks, retries, errors.
 - Class: static types, fields, methods, inheritance, aggregation, composition.
 - Activity: workflows, branching, approvals, process steps.
-- State: lifecycle states and event-driven transitions; use explicit state declarations or `[*]` transitions.
+- State: lifecycle states and event-driven transitions; use explicit state declarations. In strict AEther dark diagrams, prefer styled Start/End states over unstyleable `[*]` pseudo-nodes.
 - Use case: actors and goals around a system boundary.
 - Component: modules, services, databases, dependencies.
 - Deployment: nodes, runtimes, infrastructure placement.
-- C4: architecture context/container/component views; use vendored C4 includes, not hand-written macro shims.
+- C4: architecture context/container/component views; use the portable C4 include form, not hand-written macro shims.
 """
 
 
 def _include_policy_reference() -> str:
-    return """# Include Policy
+    return f"""# Include Policy
 
 Prefer self-contained PlantUML.
 
-Allowed includes must be local, vendored, and auditable. Block arbitrary HTTP/HTTPS `!includeurl` usage. Use C4 includes only when C4 notation is requested or clearly needed. In this repo, prefer `!include C4_Container.puml` for C4 container views and do not redefine C4 macros inline.
+Allowed includes must be local, vendored, and auditable. Block arbitrary HTTP/HTTPS `!includeurl` usage. Use C4 includes only when C4 notation is requested or clearly needed. For C4 container views, prefer `{C4_CONTAINER_INCLUDE}` because it is portable to the public PlantUML server and resolves to the repo-vendored C4 snapshot in local validation. Do not redefine C4 macros inline.
 """
 
 
@@ -266,11 +273,114 @@ Return exactly one complete PlantUML document for a single-diagram request. The 
 """
 
 
+def _palette_contract_reference() -> str:
+    return f"""# PlantUML Palette Contract
+
+Use this contract for generated PlantUML diagrams unless the user explicitly
+asks for another visual style. The colors are derived from The AEther Flow
+Website dark diagram palette.
+
+## Palette Boundary
+
+Use only these literal hex colors for fills, strokes, text, arrows, and labels:
+
+- black canvas: `#000000`
+- near-black fill: `#050403`
+- elevated near-black fill: `#080401`
+- ivory text: `#fff8ef`
+- muted ivory stroke and arrows: `#d6c3b4`
+- cyan family: `#0f364d`, `#164964`, `#2d7ea0`, `#48a0c0`
+- orange family: `#270b01`, `#702000`, `#f87800`
+- warm highlight stroke: `#f4d6a1`
+- white target text when needed for contrast: `#ffffff`
+
+The required baseline colors for generated diagrams are `#000000`, `#050403`,
+`#fff8ef`, and `#d6c3b4`.
+
+When `#0f364d` is used as a shape fill, including actors and C4 persons, use
+`#d6c3b4` for the outline. Do not use `#48a0c0` as the outline on `#0f364d`
+fills; it is too close visually for small strokes on the black canvas.
+
+## Certified Family Blocks
+
+Use `aether_dark_style_block(diagram_type)` in repository tooling. For manual
+generation, insert the complete matching family block immediately after
+`@start...`.
+
+Certified rendered-palette families are sequence, class, activity, state,
+component, usecase, and C4. Non-core families such as mindmap, gantt, object,
+deployment, timing, and WBS use the shared base block only until a rendered
+fixture certifies the family. Unknown family names are rejected by repository
+tooling instead of silently receiving the base block.
+
+### Sequence
+
+```plantuml
+{aether_dark_style_block("sequence")}
+```
+
+### Class
+
+```plantuml
+{aether_dark_style_block("class")}
+```
+
+### Activity
+
+```plantuml
+{aether_dark_style_block("activity")}
+```
+
+### State
+
+```plantuml
+{aether_dark_style_block("state")}
+```
+
+### Component
+
+```plantuml
+{aether_dark_style_block("component")}
+```
+
+### Use Case
+
+```plantuml
+{aether_dark_style_block("usecase")}
+```
+
+## C4 Style Block
+
+For C4 diagrams, place the portable C4 include first, then this style block.
+Repository validation maps this standard-library include to the vendored C4
+snapshot:
+
+```plantuml
+{C4_CONTAINER_INCLUDE}
+{AETHER_DARK_C4_STYLE_BLOCK}
+```
+
+Use C4 macros normally after that. Do not reimplement C4 macros inline.
+
+## Rendered Validation
+
+The strict `aether_dark_rendered_required` policy validates rendered SVG output:
+no warning banner, no colors outside the approved palette, required role colors
+present, and declared role-pair contrast thresholds satisfied. The rendered
+exception color set starts empty; add exceptions only with visual proof and a
+fixture.
+
+Color is not the only meaning carrier. Use shape, line style, labels, notes, and
+grouping to encode the diagram-specific grammar.
+"""
+
+
 def _examples_reference(records: list[CorpusRecord]) -> str:
-    static = """# Examples
+    static = f"""# Examples
 
 ```plantuml
 @startuml
+{aether_dark_style_block("sequence")}
 actor Client
 participant API
 database Database
@@ -283,11 +393,51 @@ API --> Client: error response
 
 ```plantuml
 @startuml
-!include C4_Container.puml
+{aether_dark_style_block("class")}
+class User {{
+  id: UUID
+  email: str
+}}
+class Account {{
+  status: str
+}}
+User "1" *-- "1..*" Account : owns
+@enduml
+```
+
+```plantuml
+@startuml
+{aether_dark_style_block("activity")}
+:Start;
+:Receive request;
+if (Valid?) then (yes)
+  :Process request;
+else (no)
+  :Return validation error;
+endif
+:End;
+@enduml
+```
+
+```plantuml
+@startuml
+{aether_dark_style_block("component")}
+component "Web App" as Web
+component "API" as API
+database "Database" as DB
+Web --> API : HTTPS
+API --> DB : SQL
+@enduml
+```
+
+```plantuml
+@startuml
+{C4_CONTAINER_INCLUDE}
+{AETHER_DARK_C4_STYLE_BLOCK}
 Person(user, "User")
-System_Boundary(system, "Diagram Service") {
+System_Boundary(system, "Diagram Service") {{
   Container(api, "API", "Python/FastAPI")
-}
+}}
 Rel(user, api, "Uses")
 @enduml
 ```

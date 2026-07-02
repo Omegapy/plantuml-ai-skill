@@ -13,6 +13,24 @@ import sys
 START_END_RE = re.compile(r"(?is)^\s*@start(?P<kind>[A-Za-z0-9_ -]*)\b.*?@end(?P=kind)\b\s*$")
 PLANTUML_DOCUMENT_RE = re.compile(r"(?is)(@start(?P<kind>[A-Za-z0-9_ -]*)\b.*?@end(?P=kind)\b)")
 FENCED_PLANTUML_RE = re.compile(r"(?is)```(?:plantuml|puml)?\s*(?P<body>@start.*?@end[A-Za-z0-9_ -]*\b)\s*```")
+HEX_COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}\b")
+AETHER_DARK_ALLOWED_COLORS = {
+    "#000000",
+    "#050403",
+    "#080401",
+    "#fff8ef",
+    "#d6c3b4",
+    "#0f364d",
+    "#164964",
+    "#2d7ea0",
+    "#48a0c0",
+    "#270b01",
+    "#702000",
+    "#f87800",
+    "#f4d6a1",
+    "#ffffff",
+}
+AETHER_DARK_REQUIRED_COLORS = {"#000000", "#050403", "#fff8ef", "#d6c3b4"}
 
 
 def main() -> int:
@@ -24,6 +42,11 @@ def main() -> int:
     parser.add_argument("--required-edge", action="append", default=[])
     parser.add_argument("--forbidden", action="append", default=["!includeurl", "TODO", "placeholder"])
     parser.add_argument("--include-root", action="append", default=[])
+    parser.add_argument(
+        "--palette-policy",
+        choices=["none", "aether-dark", "aether_dark_required", "aether-dark-rendered", "aether_dark_rendered_required"],
+        default="none",
+    )
     parser.add_argument("--render", action="store_true")
     parser.add_argument("--render-dir", default="")
     parser.add_argument("--c4", action="store_true")
@@ -79,6 +102,7 @@ def _validate_with_repo_evaluator(args: argparse.Namespace, puml_text: str, path
         forbidden_patterns=list(args.forbidden),
         required_edges=_required_edges(args.required_edge),
         include_policy=include_policy,
+        palette_policy=_palette_policy(args.palette_policy),
         purpose=["manual"],
         difficulty="manual",
         tags=["manual"],
@@ -134,6 +158,7 @@ def _portable_failures(args: argparse.Namespace, text: str) -> list[tuple[str, s
     for pattern in args.forbidden:
         if pattern and pattern.lower() in text.lower():
             failures.append(("forbidden_output_pattern", f"Forbidden pattern was present: {pattern!r}."))
+    failures.extend(_portable_palette_failures(args.palette_policy, puml))
     for pattern in args.required:
         if pattern and pattern.lower() not in puml.lower():
             failures.append(("missing_required_pattern", f"Required pattern is missing: {pattern!r}."))
@@ -145,6 +170,39 @@ def _portable_failures(args: argparse.Namespace, text: str) -> list[tuple[str, s
         actual_type = _portable_diagram_type(puml)
         if actual_type != expected_type:
             failures.append(("wrong_diagram_family", f"Expected diagram type {expected_type!r}, got {actual_type!r}."))
+    return failures
+
+
+def _palette_policy(value: str) -> str:
+    if value == "aether-dark":
+        return "aether_dark_required"
+    if value == "aether-dark-rendered":
+        return "aether_dark_rendered_required"
+    return value
+
+
+def _portable_palette_failures(policy: str, puml: str) -> list[tuple[str, str]]:
+    normalized = _palette_policy(policy)
+    if normalized == "none":
+        return []
+    colors = {match.group(0).lower() for match in HEX_COLOR_RE.finditer(puml)}
+    missing = sorted(AETHER_DARK_REQUIRED_COLORS - colors)
+    unapproved = sorted(colors - AETHER_DARK_ALLOWED_COLORS)
+    failures = []
+    details = []
+    if missing:
+        details.append(f"missing required colors: {', '.join(missing)}")
+    if unapproved:
+        details.append(f"unapproved colors: {', '.join(unapproved)}")
+    if details:
+        failures.append(("palette_policy_violation", "; ".join(details)))
+    if normalized == "aether_dark_rendered_required":
+        failures.append(
+            (
+                "render_palette_check_skipped",
+                "AEther rendered palette policy requires the full runtime renderer.",
+            )
+        )
     return failures
 
 

@@ -38,6 +38,7 @@ RUNTIME_FILES = (
     "improvement/attempts.py",
     "improvement/evaluator.py",
     "improvement/models.py",
+    "improvement/palette.py",
     "improvement/scoring.py",
     "improvement/state.py",
 )
@@ -323,9 +324,10 @@ def _skill_text_for_tier(tier: PackageTier, platform: str) -> str:
             "Use this skill whenever the user asks for PlantUML, UML-as-code, diagram source, diagram repair, or a rendered/checkable diagram that should be expressed as PlantUML.",
             "Use this skill whenever the user asks for PlantUML, UML-as-code, diagram source, or diagram repair.",
         )
-        text = text.replace("7. Validate syntax shape locally before claiming success.\n", "")
+        text = text.replace("8. Validate syntax and palette shape locally before claiming success.\n", "")
+        text = text.replace("7. Validate locally with the bundled script or `plantuml-skill improve evaluate` when a run exists.\n", "")
         text = text.replace(
-            "8. When working in this repository, run `.agents/skills/plantuml-diagram/scripts/validate_plantuml_attempt.py` or `plantuml-skill improve evaluate` if an eval run exists.\n",
+            "9. When working in this repository, run `.agents/skills/plantuml-diagram/scripts/validate_plantuml_attempt.py --palette-policy aether-dark-rendered --render` or `plantuml-skill improve evaluate` if an eval run exists.\n",
             "",
         )
         return text

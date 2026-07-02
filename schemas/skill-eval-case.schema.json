@@ -27,6 +27,16 @@
     "tags": { "type": "array", "items": { "type": "string" } },
     "allow_multiple_blocks": { "type": "boolean" },
     "hidden": { "type": "boolean" },
-    "source_context": { "type": "string" }
+    "source_context": { "type": "string" },
+    "palette_policy": {
+      "type": "string",
+      "enum": [
+        "none",
+        "aether_dark_required",
+        "aether-dark",
+        "aether_dark_rendered_required",
+        "aether-dark-rendered"
+      ]
+    }
   }
 }

@@ -23,6 +23,9 @@ CLUSTER_ALIASES = {
     "graphviz_layout_failure": "graphviz_layout_failure",
     "render_failed": "render_failed",
     "missing_attempt": "missing_attempt",
+    "palette_policy_violation": "palette_policy_violation",
+    "render_palette_check_skipped": "render_palette_policy_violation",
+    "render_palette_policy_violation": "render_palette_policy_violation",
 }
 
 
@@ -110,4 +113,6 @@ def _lesson_instruction(cluster_id: str) -> str:
         "omitted_required_actor": "List the user's named actors/entities before drawing relationships so none are omitted.",
         "missing_required_relationship": "Add explicit relationships for every requested interaction, ownership, dependency, or transition.",
         "render_failed": "Prefer simple PlantUML syntax that renders through the pinned Java PlantUML jar.",
+        "palette_policy_violation": "When the AEther palette is required, insert the dark PlantUML style block immediately after @start... and use only contract colors.",
+        "render_palette_policy_violation": "For strict AEther rendered palette cases, use the certified family style block and avoid unstyleable PlantUML pseudo-nodes or fallback colors.",
     }.get(cluster_id, "")

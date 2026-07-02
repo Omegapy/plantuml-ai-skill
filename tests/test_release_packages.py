@@ -13,6 +13,7 @@ import unittest
 import zipfile
 
 from plantuml_ai_skill.release_packages import build_release_packages
+from plantuml_ai_skill.improvement.palette import AETHER_DARK_STYLE_BLOCK
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -194,12 +195,35 @@ class ReleasePackageTests(unittest.TestCase):
 
             valid = project / "valid.md"
             valid.write_text("```plantuml\n@startuml\nAlice -> Bob: hi\n@enduml\n```\n", encoding="utf-8")
+            styled = project / "styled.md"
+            styled.write_text(
+                f"```plantuml\n@startuml\n{AETHER_DARK_STYLE_BLOCK}\nAlice -> Bob: hi\n@enduml\n```\n",
+                encoding="utf-8",
+            )
             invalid = project / "invalid.puml"
             invalid.write_text("@startuml\nAlice -> Bob: hi\n@enduml\n@startuml\nBob -> Alice: ok\n@enduml\n", encoding="utf-8")
             cli = project / ".agents" / "bin" / "plantuml-ai"
             ambient_env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
             ok = subprocess.run(
                 [str(cli), "validate", str(valid), "--expected-type", "sequence", "--required", "Alice"],
+                cwd=project,
+                env=ambient_env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+            palette_ok = subprocess.run(
+                [str(cli), "validate", str(styled), "--expected-type", "sequence", "--palette-policy", "aether-dark"],
+                cwd=project,
+                env=ambient_env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+            palette_bad = subprocess.run(
+                [str(cli), "validate", str(valid), "--expected-type", "sequence", "--palette-policy", "aether-dark"],
                 cwd=project,
                 env=ambient_env,
                 stdout=subprocess.PIPE,
@@ -219,6 +243,9 @@ class ReleasePackageTests(unittest.TestCase):
 
         self.assertEqual(0, ok.returncode, ok.stdout + ok.stderr)
         self.assertIn("validator=portable", ok.stdout)
+        self.assertEqual(0, palette_ok.returncode, palette_ok.stdout + palette_ok.stderr)
+        self.assertEqual(1, palette_bad.returncode)
+        self.assertIn("palette_policy_violation", palette_bad.stdout)
         self.assertEqual(1, bad.returncode)
         self.assertIn("multiple_plantuml_blocks", bad.stdout)
 
@@ -279,7 +306,7 @@ class ReleasePackageTests(unittest.TestCase):
             c4_text = textwrap.dedent(
                 """\
                 @startuml
-                !include C4_Container.puml
+                !include <C4/C4_Container.puml>
                 Person(user, "User")
                 Container(api, "API", "Python")
                 Rel(user, api, "Uses")

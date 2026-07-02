@@ -29,6 +29,44 @@ class ImprovementModelsTests(unittest.TestCase):
             }
         )
         self.assertEqual([("Client", "API")], case.required_edges)
+        self.assertEqual("none", case.palette_policy)
+
+    def test_eval_case_palette_policy_round_trips(self) -> None:
+        case = SkillEvalCase.from_mapping(
+            {
+                "id": "sequence-aether-palette",
+                "suite": "core",
+                "prompt": "Create a sequence diagram.",
+                "expected_diagram_type": "sequence",
+                "required_patterns": ["Client"],
+                "forbidden_patterns": ["!includeurl"],
+                "required_edges": [["Client", "API"]],
+                "include_policy": "self_contained_only",
+                "palette_policy": "aether-dark",
+            }
+        )
+        self.assertEqual("aether_dark_required", case.palette_policy)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "cases.jsonl"
+            write_jsonl([case], path)
+            loaded = read_jsonl(path, SkillEvalCase)
+        self.assertEqual(case.to_mapping(), loaded[0].to_mapping())
+
+    def test_eval_case_rendered_palette_policy_round_trips(self) -> None:
+        case = SkillEvalCase.from_mapping(
+            {
+                "id": "sequence-aether-rendered-palette",
+                "suite": "core",
+                "prompt": "Create a sequence diagram.",
+                "expected_diagram_type": "sequence",
+                "required_patterns": ["Client"],
+                "forbidden_patterns": ["!includeurl"],
+                "required_edges": [["Client", "API"]],
+                "include_policy": "self_contained_only",
+                "palette_policy": "aether-dark-rendered",
+            }
+        )
+        self.assertEqual("aether_dark_rendered_required", case.palette_policy)
 
     def test_invalid_eval_case_rejects_unknown_fields(self) -> None:
         with self.assertRaises(ValueError):

@@ -62,6 +62,10 @@ class ReleasePackageTests(unittest.TestCase):
                 name: _tar_text(Path(left) / name, f"{name.removesuffix('.tar.gz')}/README.md")
                 for name in members_by_archive
             }
+            manifests = {
+                name: _tar_json(Path(left) / name, f"{name.removesuffix('.tar.gz')}/manifest.json")
+                for name in members_by_archive
+            }
             windows_members_by_archive = {
                 "plantuml-diagram-core-test-windows.zip": windows_core_members,
                 "plantuml-diagram-validate-test-windows.zip": windows_validate_members,
@@ -72,13 +76,26 @@ class ReleasePackageTests(unittest.TestCase):
                 name: _zip_text(Path(left) / name, f"{name.removesuffix('.zip')}/README.md")
                 for name in windows_members_by_archive
             }
+            windows_manifests = {
+                name: _zip_json(Path(left) / name, f"{name.removesuffix('.zip')}/manifest.json")
+                for name in windows_members_by_archive
+            }
             windows_install = _zip_text(
                 Path(left) / "plantuml-diagram-render-test-windows.zip",
                 "plantuml-diagram-render-test-windows/install.ps1",
             )
+            core_openai = _tar_text(
+                Path(left) / "plantuml-diagram-core-test.tar.gz",
+                "plantuml-diagram-core-test/payload/skills/plantuml-diagram/agents/openai.yaml",
+            )
             sums = (Path(left) / "SHA256SUMS").read_text(encoding="utf-8")
 
         self.assertIn("plantuml-diagram-core-test/payload/skills/plantuml-diagram/SKILL.md", core_members)
+        self.assertIn(
+            "plantuml-diagram-core-test/payload/skills/plantuml-diagram/agents/openai.yaml",
+            core_members,
+        )
+        self.assertIn('display_name: "PlantUML Diagram"', core_openai)
         self.assertFalse(any("/scripts/" in member for member in core_members))
         self.assertFalse(any(member.endswith("/payload/bin/plantuml-ai") for member in core_members))
         self.assertIn(
@@ -92,6 +109,7 @@ class ReleasePackageTests(unittest.TestCase):
         )
         self.assertIn("plantuml-diagram-c4-test/payload/vendor/c4-plantuml/C4_Container.puml", c4_members)
         for members in (core_members, validate_members, render_members, c4_members):
+            self.assertTrue(any(member.endswith("/payload/skills/plantuml-diagram/agents/openai.yaml") for member in members))
             self.assertFalse(any("/payload/data/" in member for member in members))
             self.assertFalse(any(member.endswith(".jar") for member in members))
         for archive_name, members in members_by_archive.items():
@@ -106,6 +124,10 @@ class ReleasePackageTests(unittest.TestCase):
             self.assertIn("not a Claude Code package", readmes[archive_name])
             self.assertIn("creating, checking, and rendering PlantUML diagrams", readmes[archive_name])
             self.assertIn("not for training, fine-tuning, or improving the skill", readmes[archive_name])
+            self.assertIn("Agent Install Contract", readmes[archive_name])
+            self.assertIn("machine-readable contract", readmes[archive_name])
+            self.assertIn("Do not install this packet into global Codex skill folders", readmes[archive_name])
+            _assert_manifest_contract(self, manifests[archive_name], package_root, members, "macOS or Linux")
         for archive_name in ("plantuml-diagram-render-test.tar.gz", "plantuml-diagram-c4-test.tar.gz"):
             self.assertIn("macOS And Linux Requirements For Rendering", readmes[archive_name])
             self.assertIn("Python 3.11 or newer", readmes[archive_name])
@@ -114,6 +136,10 @@ class ReleasePackageTests(unittest.TestCase):
             self.assertIn("sudo apt install python3 openjdk-17-jre graphviz curl", readmes[archive_name])
         self.assertIn("bundled C4 diagram support", readmes["plantuml-diagram-c4-test.tar.gz"])
         self.assertIn("plantuml-diagram-core-test-windows/payload/skills/plantuml-diagram/SKILL.md", windows_core_members)
+        self.assertIn(
+            "plantuml-diagram-core-test-windows/payload/skills/plantuml-diagram/agents/openai.yaml",
+            windows_core_members,
+        )
         self.assertFalse(any("/scripts/" in member for member in windows_core_members))
         self.assertFalse(any(member.endswith("/payload/bin/plantuml-ai.cmd") for member in windows_core_members))
         self.assertIn(
@@ -127,6 +153,10 @@ class ReleasePackageTests(unittest.TestCase):
             windows_render_members,
         )
         self.assertIn("plantuml-diagram-c4-test-windows/payload/vendor/c4-plantuml/C4_Container.puml", windows_c4_members)
+        for members in (windows_core_members, windows_validate_members, windows_render_members, windows_c4_members):
+            self.assertTrue(any(member.endswith("/payload/skills/plantuml-diagram/agents/openai.yaml") for member in members))
+            self.assertFalse(any("/payload/data/" in member for member in members))
+            self.assertFalse(any(member.endswith(".jar") for member in members))
         for archive_name, members in windows_members_by_archive.items():
             package_root = archive_name.removesuffix(".zip")
             self.assertIn(f"{package_root}/README.md", members)
@@ -138,6 +168,10 @@ class ReleasePackageTests(unittest.TestCase):
             self.assertIn("hidden `.agents` folder", windows_readmes[archive_name])
             self.assertIn("for Codex and the Codex app", windows_readmes[archive_name])
             self.assertIn("not a Claude Code package", windows_readmes[archive_name])
+            self.assertIn("Agent Install Contract", windows_readmes[archive_name])
+            self.assertIn("machine-readable contract", windows_readmes[archive_name])
+            self.assertIn("Do not install this packet into global Codex skill folders", windows_readmes[archive_name])
+            _assert_manifest_contract(self, windows_manifests[archive_name], package_root, members, "Windows 11")
         for archive_name in ("plantuml-diagram-render-test-windows.zip", "plantuml-diagram-c4-test-windows.zip"):
             self.assertIn("Requirements For Rendering", windows_readmes[archive_name])
             self.assertIn("Python 3.11 or newer", windows_readmes[archive_name])
@@ -165,6 +199,9 @@ class ReleasePackageTests(unittest.TestCase):
             text = skill.read_text(encoding="utf-8")
             bin_exists = (project / ".agents" / "bin" / "plantuml-ai").exists()
             scripts_exists = (project / ".agents" / "skills" / "plantuml-diagram" / "scripts").exists()
+            openai_metadata_exists = (
+                project / ".agents" / "skills" / "plantuml-diagram" / "agents" / "openai.yaml"
+            ).exists()
 
             skill.write_text("custom user file\n", encoding="utf-8")
             protected = _install(package_dir, project)
@@ -176,6 +213,7 @@ class ReleasePackageTests(unittest.TestCase):
         self.assertEqual("plantuml-diagram-core", installed["package_name"])
         self.assertFalse(bin_exists)
         self.assertFalse(scripts_exists)
+        self.assertTrue(openai_metadata_exists)
         self.assertNotIn("validate_plantuml_attempt.py", text)
         self.assertEqual(1, protected.returncode)
         self.assertIn("Refusing to overwrite", protected.stderr)
@@ -480,6 +518,37 @@ def _zip_members(archive: Path) -> list[str]:
 def _zip_text(archive: Path, member: str) -> str:
     with zipfile.ZipFile(archive) as zf:
         return zf.read(member).decode("utf-8")
+
+
+def _tar_json(archive: Path, member: str) -> dict[str, object]:
+    return json.loads(_tar_text(archive, member))
+
+
+def _zip_json(archive: Path, member: str) -> dict[str, object]:
+    return json.loads(_zip_text(archive, member))
+
+
+def _assert_manifest_contract(
+    test: unittest.TestCase,
+    manifest: dict[str, object],
+    package_root: str,
+    members: list[str],
+    supported_platform: str,
+) -> None:
+    test.assertEqual("plantuml-skill-package.v1", manifest["schema_version"])
+    test.assertEqual(supported_platform, manifest["supported_platform"])
+    test.assertEqual("project-local", manifest["install_target"]["type"])
+    test.assertEqual(".agents", manifest["install_target"]["default_prefix"])
+    test.assertIn("Run the installer from the target project root", manifest["install_target"]["description"])
+    test.assertEqual("target project root", manifest["installer"]["run_from"])
+    test.assertIn("command", manifest["installer"])
+    test.assertIn("options", manifest["installer"])
+    test.assertEqual(manifest["capability"], manifest["tier_capability"])
+    test.assertIn(".agents/skills/plantuml-diagram/agents/openai.yaml", manifest["installed_paths"])
+    test.assertIn("post_install_verification_commands", manifest)
+    test.assertTrue(manifest["post_install_verification_commands"])
+    for entrypoint in manifest["entrypoints"]:
+        test.assertIn(f"{package_root}/payload/{entrypoint.removeprefix('.agents/')}", members)
 
 
 def _fake_renderer(root: Path) -> tuple[Path, Path]:

@@ -1,0 +1,7 @@
+interface:
+  display_name: "PlantUML Diagram"
+  short_description: "Generate and validate PlantUML diagrams"
+  default_prompt: "Use $plantuml-diagram to create a clear PlantUML diagram from this request."
+
+policy:
+  allow_implicit_invocation: true

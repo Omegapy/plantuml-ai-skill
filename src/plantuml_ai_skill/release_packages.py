@@ -21,6 +21,7 @@ from .constants import PROJECT_ROOT
 
 C4_COMMIT = "1edfb8a878baaa821e54cf423a070c792e8677c6"
 C4_ARCHIVE_URL = f"https://github.com/plantuml-stdlib/C4-PlantUML/archive/{C4_COMMIT}.tar.gz"
+PACKAGE_SCHEMA_VERSION = "plantuml-skill-package.v1"
 SKILL_DIR = PROJECT_ROOT / ".agents" / "skills" / "plantuml-diagram"
 SUPPORTED_PLATFORMS = ("posix", "windows", "all")
 
@@ -212,6 +213,13 @@ def _stage_skill(tier: PackageTier, payload: Path, platform: str) -> None:
     references = target / "references"
     references.mkdir(parents=True)
     (target / "SKILL.md").write_text(_skill_text_for_tier(tier, platform), encoding="utf-8")
+    agents_source = SKILL_DIR / "agents"
+    if agents_source.exists():
+        for source in sorted(agents_source.rglob("*")):
+            if source.is_file():
+                destination = target / "agents" / source.relative_to(agents_source)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
     for source in sorted((SKILL_DIR / "references").iterdir()):
         if source.is_file():
             shutil.copy2(source, references / source.name)
@@ -299,18 +307,101 @@ def _manifest(
         else:
             entrypoints.extend([".agents/bin/plantuml-ai.cmd", ".agents/bin/plantuml-ai.ps1"])
     return {
+        "schema_version": PACKAGE_SCHEMA_VERSION,
         "package_name": tier.name,
         "version": version,
         "platform": platform,
+        "supported_platform": _supported_platform_label(platform),
         "archive_format": archive_format,
         "source_commit": _git_commit(),
         "capability": tier.capability,
+        "tier_capability": tier.capability,
         "dependencies": dependencies,
         "c4_commit": C4_COMMIT if tier.include_c4 else "",
         "default_prefix": ".agents",
+        "install_target": {
+            "type": "project-local",
+            "default_prefix": ".agents",
+            "description": "Run the installer from the target project root. Files are copied into that project's .agents tree.",
+            "skill_path": ".agents/skills/plantuml-diagram",
+        },
+        "installer": _installer_contract(tier, version, platform),
+        "installed_paths": _installed_paths(tier, platform),
         "entrypoints": entrypoints,
+        "post_install_verification_commands": _post_install_verification_commands(tier, platform),
         "payload_files": payload_files,
     }
+
+
+def _supported_platform_label(platform: str) -> str:
+    if platform == "windows":
+        return "Windows 11"
+    return "macOS or Linux"
+
+
+def _installer_contract(tier: PackageTier, version: str, platform: str) -> dict[str, object]:
+    folder_name = f"{tier.name}-{version}-windows" if platform == "windows" else f"{tier.name}-{version}"
+    if platform == "windows":
+        return {
+            "run_from": "target project root",
+            "script": "install.ps1",
+            "command": f"powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\path\\to\\{folder_name}\\install.ps1",
+            "alternate_command": f".\\{folder_name}\\install.cmd",
+            "options": ["-DryRun", "-Force", "-Prefix .agents", "-NoAssets", "-OfflineJar PATH"],
+        }
+    return {
+        "run_from": "target project root",
+        "script": "install.sh",
+        "command": f"bash /path/to/{folder_name}/install.sh",
+        "alternate_command": f"bash {folder_name}/install.sh",
+        "options": ["--dry-run", "--force", "--prefix .agents", "--no-assets", "--offline-jar PATH"],
+    }
+
+
+def _installed_paths(tier: PackageTier, platform: str) -> list[str]:
+    paths = [
+        ".agents/skills/plantuml-diagram/SKILL.md",
+        ".agents/skills/plantuml-diagram/agents/openai.yaml",
+        ".agents/skills/plantuml-diagram/references/",
+        ".agents/plantuml-ai-skill/install-manifest.json",
+    ]
+    if tier.include_validator:
+        paths.append(".agents/skills/plantuml-diagram/scripts/validate_plantuml_attempt.py")
+        if platform == "windows":
+            paths.extend([".agents/bin/plantuml-ai.cmd", ".agents/bin/plantuml-ai.ps1"])
+        else:
+            paths.append(".agents/bin/plantuml-ai")
+    if tier.include_runtime:
+        paths.append(".agents/tools/plantuml-ai-skill/")
+    if tier.include_c4:
+        paths.append(".agents/vendor/c4-plantuml/")
+    return paths
+
+
+def _post_install_verification_commands(tier: PackageTier, platform: str) -> list[str]:
+    if platform == "windows":
+        commands = [
+            "Test-Path .\\.agents\\skills\\plantuml-diagram\\SKILL.md",
+            "Test-Path .\\.agents\\skills\\plantuml-diagram\\agents\\openai.yaml",
+        ]
+        if tier.include_validator:
+            commands.append(".\\.agents\\bin\\plantuml-ai.cmd validate diagram.puml")
+        if tier.include_runtime:
+            commands.append(".\\.agents\\bin\\plantuml-ai.cmd doctor")
+        if tier.include_c4:
+            commands.append(".\\.agents\\bin\\plantuml-ai.cmd render c4-diagram.puml --c4 --output c4-diagram.svg")
+        return commands
+    commands = [
+        "test -f .agents/skills/plantuml-diagram/SKILL.md",
+        "test -f .agents/skills/plantuml-diagram/agents/openai.yaml",
+    ]
+    if tier.include_validator:
+        commands.append(".agents/bin/plantuml-ai validate diagram.puml")
+    if tier.include_runtime:
+        commands.append(".agents/bin/plantuml-ai doctor")
+    if tier.include_c4:
+        commands.append(".agents/bin/plantuml-ai render c4-diagram.puml --c4 --output c4-diagram.svg")
+    return commands
 
 
 def _skill_text_for_tier(tier: PackageTier, platform: str) -> str:
@@ -370,6 +461,7 @@ def _readme(tier: PackageTier, version: str, platform: str) -> str:
     command_path = ".agents\\bin\\plantuml-ai.cmd" if is_windows else ".agents/bin/plantuml-ai"
     fence = "```powershell" if is_windows else "```bash"
     install_files = ["  install.ps1", "  install.cmd"] if is_windows else ["  install.sh"]
+    verification_commands = _post_install_verification_commands(tier, platform)
     lines = [
         f"# {tier.name} {version}",
         "",
@@ -396,6 +488,21 @@ def _readme(tier: PackageTier, version: str, platform: str) -> str:
         "You are now inside the unzipped installer folder. The `payload/` folder is not the final installed location.",
         "",
         "The installer copies the useful files into your project's hidden `.agents` folder, where Codex can read them.",
+        "",
+        "## Agent Install Contract",
+        "",
+        "For AI agents and automation, treat `manifest.json` as the machine-readable contract for this packet.",
+        "",
+        "- Run the installer from the target project root.",
+        "- Use the default project-local install target `.agents/` unless the user explicitly chooses another `.agents/...` prefix.",
+        "- Do not install this packet into global Codex skill folders.",
+        "- After install, run the listed verification commands that apply to the package tier.",
+        "",
+        "Post-install verification commands:",
+        "",
+        fence,
+        *verification_commands,
+        "```",
         "",
         "## Install Into Your Project",
         "",
